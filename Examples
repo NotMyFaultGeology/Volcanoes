@@ -1,0 +1,509 @@
+import React, { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
+import { CheckCircle2, PlayCircle, RotateCcw, Mountain } from "lucide-react";
+
+const worldGeoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+
+const volcanoes = [
+  {
+    id: "rainier",
+    name: "Mt. Rainier",
+    region: "Washington, USA",
+    video: "https://youtu.be/fOQit0tDoIg",
+    coordinates: [-121.7603, 46.8523],
+    questions: [
+      "What volcanic hazard discussed in the video could affect nearby communities?",
+      "Why is Mt. Rainier considered dangerous even when it is not erupting?",
+      "What is one preparedness step people can take in areas around Mt. Rainier?",
+    ],
+  },
+  {
+    id: "hawaii",
+    name: "Hawaii",
+    region: "Hawaiian Islands, USA",
+    video: "https://youtu.be/h_65yAqD_T0",
+    coordinates: [-155.292, 19.421],
+    questions: [
+      "What type of volcanic activity is commonly associated with Hawaii?",
+      "How does Hawaiian lava typically affect people, land, or infrastructure?",
+      "What did you learn from the video about how eruptions in Hawaii differ from explosive eruptions?",
+    ],
+  },
+  {
+    id: "ruiz",
+    name: "Nevado del Ruiz",
+    region: "Colombia",
+    video: "https://youtu.be/rvHW917msMc",
+    coordinates: [-75.322, 4.892],
+    questions: [
+      "What major hazard made Nevado del Ruiz especially deadly?",
+      "How did snow and ice contribute to the disaster described in the video?",
+      "What lesson does this eruption teach about warning systems and evacuation?",
+    ],
+  },
+  {
+    id: "pinatubo",
+    name: "Mt. Pinatubo",
+    region: "Philippines",
+    video: "https://youtu.be/JO6l7vK_3xs",
+    coordinates: [120.349, 15.142],
+    questions: [
+      "What happened during the Pinatubo eruption that made it globally significant?",
+      "What hazards affected people closest to the volcano?",
+      "How did monitoring and evacuation efforts help reduce loss of life?",
+    ],
+  },
+  {
+    id: "fuji",
+    name: "Mt. Fuji",
+    region: "Japan",
+    video: "https://youtu.be/DXKsVVebxo8",
+    coordinates: [138.7274, 35.3606],
+    questions: [
+      "Why is Mt. Fuji important to monitor even though it has not erupted recently?",
+      "What hazards could an eruption of Mt. Fuji create for nearby populations?",
+      "What detail from the video stood out to you most about Fuji?",
+    ],
+  },
+];
+
+const initialAnswers = Object.fromEntries(
+  volcanoes.map((v) => [v.id, ["", "", ""]])
+);
+
+function VolcanoMarker({ volcano, isDone, onChoose }) {
+  return (
+    <Marker coordinates={volcano.coordinates}>
+      <g
+        transform="translate(-12, -28)"
+        onClick={() => !isDone && onChoose(volcano.id)}
+        style={{ cursor: isDone ? "default" : "pointer" }}
+      >
+        <motion.g whileHover={!isDone ? { scale: 1.05 } : {}}>
+          <path
+            d="M12 0C5.4 0 0 5.4 0 12c0 8.7 12 24 12 24s12-15.3 12-24C24 5.4 18.6 0 12 0z"
+            fill={isDone ? "#16a34a" : "#dc2626"}
+            stroke="white"
+            strokeWidth="2"
+          />
+          <circle cx="12" cy="12" r="4.5" fill="white" />
+        </motion.g>
+      </g>
+      <foreignObject x={14} y={-14} width={160} height={64}>
+        <button
+          onClick={() => !isDone && onChoose(volcano.id)}
+          disabled={isDone}
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${isDone ? "#86efac" : "rgba(255,255,255,0.8)"}`,
+            padding: "8px 12px",
+            textAlign: "left",
+            boxShadow: "0 8px 24px rgba(15,23,42,0.14)",
+            background: isDone ? "rgba(240,253,244,0.95)" : "rgba(255,255,255,0.95)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            cursor: isDone ? "default" : "pointer",
+            width: 150,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.1 }}>{volcano.name}</div>
+          <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.2, marginTop: 2 }}>{volcano.region}</div>
+          <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+            {isDone ? "Completed" : "Open activity"}
+          </div>
+        </button>
+      </foreignObject>
+    </Marker>
+  );
+}
+
+function CardBox({ children, style = {} }) {
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        borderRadius: 24,
+        boxShadow: "0 16px 40px rgba(15,23,42,0.10)",
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function PrimaryButton({ children, onClick, disabled = false, outline = false, style = {}, ...props }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        borderRadius: 16,
+        border: outline ? "1px solid #cbd5e1" : "none",
+        background: disabled ? "#cbd5e1" : outline ? "#ffffff" : "#0f172a",
+        color: disabled ? "#475569" : outline ? "#0f172a" : "#ffffff",
+        padding: "12px 18px",
+        fontWeight: 700,
+        cursor: disabled ? "not-allowed" : "pointer",
+        ...style,
+      }}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TextInput({ value, onChange, placeholder }) {
+  return (
+    <input
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={{
+        width: "100%",
+        height: 48,
+        borderRadius: 16,
+        border: "1px solid #cbd5e1",
+        padding: "0 14px",
+        fontSize: 16,
+        outline: "none",
+        boxSizing: "border-box",
+      }}
+    />
+  );
+}
+
+function ProgressBar({ value }) {
+  return (
+    <div style={{ height: 12, borderRadius: 999, background: "#e2e8f0", overflow: "hidden" }}>
+      <div
+        style={{
+          height: "100%",
+          width: `${value}%`,
+          background: "linear-gradient(90deg, #2563eb, #0ea5e9)",
+          borderRadius: 999,
+          transition: "width 0.25s ease",
+        }}
+      />
+    </div>
+  );
+}
+
+function volcanoProgress(completed) {
+  return Math.round((completed.length / volcanoes.length) * 100);
+}
+
+export default function VolcanoVideoQuizApp() {
+  const [selectedId, setSelectedId] = useState(null);
+  const [step, setStep] = useState("map"); // map | video | questions | done
+  const [completed, setCompleted] = useState([]);
+  const [answers, setAnswers] = useState(initialAnswers);
+  const [videoChecked, setVideoChecked] = useState(false);
+
+  const selected = useMemo(
+    () => volcanoes.find((v) => v.id === selectedId) ?? null,
+    [selectedId]
+  );
+
+
+  const chooseVolcano = (id) => {
+    if (completed.includes(id)) return;
+    setSelectedId(id);
+    setVideoChecked(false);
+    setStep("video");
+  };
+
+  const updateAnswer = (volcanoId, index, value) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [volcanoId]: prev[volcanoId].map((ans, i) => (i === index ? value : ans)),
+    }));
+  };
+
+  const canSubmit = selected
+    ? answers[selected.id].every((a) => a.trim().length > 0)
+    : false;
+
+  const submitLocation = () => {
+    if (!selected || !canSubmit) return;
+    if (!completed.includes(selected.id)) {
+      const updated = [...completed, selected.id];
+      setCompleted(updated);
+      if (updated.length === volcanoes.length) {
+        setStep("done");
+      } else {
+        setSelectedId(null);
+        setStep("map");
+      }
+    }
+  };
+
+  const resetApp = () => {
+    setSelectedId(null);
+    setStep("map");
+    setCompleted([]);
+    setAnswers(initialAnswers);
+    setVideoChecked(false);
+  };
+
+  return (
+      return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f8fafc",
+        padding: 24,
+        fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        color: "#0f172a",
+      }}
+    >
+      <div style={{ margin: "0 auto", maxWidth: 1320 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 1.3fr) minmax(320px, 0.7fr)" }}
+        >
+          <CardBox>
+            <div style={{ padding: 28 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 32, fontWeight: 800, lineHeight: 1.1 }}>
+                    <Mountain size={32} /> Volcano Video Map Activity
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 16, color: "#475569", maxWidth: 760 }}>
+                    Students select one of five volcano locations, watch the video, answer three questions, and return to the map until all five are complete.
+                  </div>
+                </div>
+                <PrimaryButton outline onClick={resetApp}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><RotateCcw size={16} /> Reset</span>
+                </PrimaryButton>
+              </div>
+
+              <div style={{ marginTop: 20, marginBottom: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#475569", marginBottom: 8 }}>
+                  <span>Progress</span>
+                  <span>{completed.length} / {volcanoes.length} complete</span>
+                </div>
+                <ProgressBar value={volcanoProgress(completed)} />
+              </div>
+
+              <AnimatePresence mode="wait">
+                {step === "map" && (
+                  <motion.div
+                    key="map"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    style={{ display: "grid", gap: 16 }}
+                  >
+                    <div style={{ overflow: "hidden", borderRadius: 28, border: "1px solid #cbd5e1", background: "linear-gradient(180deg,#dff3ff 0%,#cfe7ff 100%)", padding: 8, boxShadow: "inset 0 2px 8px rgba(255,255,255,0.7)" }}>
+                      <div style={{ borderRadius: 24, background: "rgba(224,242,254,0.7)" }}>
+                        <ComposableMap projection="geoEqualEarth" projectionConfig={{ scale: 180 }} style={{ width: "100%", height: 520 }}>
+                          <Geographies geography={worldGeoUrl}>
+                            {({ geographies }) =>
+                              geographies.map((geo) => (
+                                <Geography
+                                  key={geo.rsmKey}
+                                  geography={geo}
+                                  style={{
+                                    default: { fill: "#bbf7d0", stroke: "#94a3b8", strokeWidth: 0.6, outline: "none" },
+                                    hover: { fill: "#bbf7d0", stroke: "#94a3b8", strokeWidth: 0.6, outline: "none" },
+                                    pressed: { fill: "#bbf7d0", stroke: "#94a3b8", strokeWidth: 0.6, outline: "none" },
+                                  }}
+                                />
+                              ))
+                            }
+                          </Geographies>
+                          {volcanoes.map((v) => (
+                            <VolcanoMarker
+                              key={v.id}
+                              volcano={v}
+                              isDone={completed.includes(v.id)}
+                              onChoose={chooseVolcano}
+                            />
+                          ))}
+                        </ComposableMap>
+                      </div>
+                    </div>
+
+                    <div style={{ borderRadius: 18, background: "#f1f5f9", padding: 16, fontSize: 14, color: "#334155" }}>
+                      Click a map marker to begin. Finished locations are marked complete and cannot be reopened unless you reset the activity.
+                    </div>
+                  </motion.div>
+                )}
+
+                {step === "video" && selected && (
+                  <motion.div
+                    key="video"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    style={{ display: "grid", gap: 16 }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                      <div>
+                        <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>{selected.name}</h2>
+                        <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>Watch the assigned video before moving to the questions.</p>
+                      </div>
+                      <PrimaryButton outline onClick={() => setStep("map")}>Back to map</PrimaryButton>
+                    </div>
+
+                    <div style={{ borderRadius: 28, overflow: "hidden", background: "#0f172a", color: "white", boxShadow: "0 16px 40px rgba(15,23,42,0.16)" }}>
+                      <div style={{ aspectRatio: "16 / 9", width: "100%", background: "radial-gradient(circle at top,#334155,#0f172a 60%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 32, boxSizing: "border-box" }}>
+                        <PlayCircle size={64} style={{ marginBottom: 16 }} />
+                        <h3 style={{ fontSize: 32, margin: 0 }}>Open the assigned video</h3>
+                        <p style={{ marginTop: 12, maxWidth: 720, color: "#cbd5e1" }}>
+                          Some preview environments block embedded YouTube playback. Use the button below to open the video directly in YouTube in a new tab.
+                        </p>
+                        <div style={{ marginTop: 24, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                          <a
+                            href={selected.video}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 8, borderRadius: 16, background: "#ffffff", color: "#0f172a", padding: "12px 18px", fontWeight: 700, textDecoration: "none" }}
+                          >
+                            <PlayCircle size={18} /> Open video in YouTube
+                          </a>
+                        </div>
+                        <p style={{ marginTop: 18, fontSize: 14, color: "#94a3b8", wordBreak: "break-all" }}>{selected.video}</p>
+                      </div>
+                    </div>
+
+                    <CardBox style={{ boxShadow: "0 12px 24px rgba(15,23,42,0.08)" }}>
+                      <div style={{ display: "flex", flexDirection: "row", gap: 16, padding: 24, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <PlayCircle size={24} />
+                          <div>
+                            <div style={{ fontWeight: 700 }}>Ready for the questions?</div>
+                            <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>
+                              Check the box after the student has watched the video.
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600 }}>
+                            <input type="checkbox" checked={videoChecked} onChange={(e) => setVideoChecked(e.target.checked)} />
+                            Video watched
+                          </label>
+                          <PrimaryButton disabled={!videoChecked} onClick={() => setStep("questions")}>Continue to questions</PrimaryButton>
+                        </div>
+                      </div>
+                    </CardBox>
+                  </motion.div>
+                )}
+
+                {step === "questions" && selected && (
+                  <motion.div
+                    key="questions"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    style={{ display: "grid", gap: 16 }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                      <div>
+                        <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>{selected.name} Questions</h2>
+                        <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>Answer all three questions to finish this location.</p>
+                      </div>
+                      <PrimaryButton outline onClick={() => setStep("video")}>Back to video</PrimaryButton>
+                    </div>
+
+                    <div style={{ display: "grid", gap: 16 }}>
+                      {selected.questions.map((question, idx) => (
+                        <CardBox key={idx} style={{ boxShadow: "0 12px 24px rgba(15,23,42,0.08)" }}>
+                          <div style={{ padding: 24, display: "grid", gap: 12 }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+                              {idx + 1}. {question}
+                            </div>
+                            <TextInput
+                              value={answers[selected.id][idx]}
+                              onChange={(e) => updateAnswer(selected.id, idx, e.target.value)}
+                              placeholder="Type the student's response here"
+                            />
+                          </div>
+                        </CardBox>
+                      ))}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", borderRadius: 24, background: "#f1f5f9", padding: 16 }}>
+                      <div style={{ fontSize: 14, color: "#334155" }}>
+                        When submitted, this location will be marked complete and the student will return to the main map.
+                      </div>
+                      <PrimaryButton disabled={!canSubmit} onClick={submitLocation}>Submit location</PrimaryButton>
+                    </div>
+                  </motion.div>
+                )}
+
+                {step === "done" && (
+                  <motion.div
+                    key="done"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    style={{ minHeight: 420, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 32, border: "1px solid #e2e8f0", background: "#ffffff", padding: 32, textAlign: "center", boxShadow: "0 16px 40px rgba(15,23,42,0.10)" }}
+                  >
+                    <CheckCircle2 size={64} color="#16a34a" style={{ marginBottom: 16 }} />
+                    <h2 style={{ fontSize: 36, margin: 0 }}>All volcano locations completed</h2>
+                    <p style={{ marginTop: 12, maxWidth: 720, color: "#475569" }}>
+                      The student has watched all five videos and answered every question set. Use reset to run the activity again.
+                    </p>
+                    <div style={{ marginTop: 24 }}>
+                      <PrimaryButton onClick={resetApp}>Start over</PrimaryButton>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </CardBox>
+
+          <CardBox>
+            <div style={{ padding: 24 }}>
+              <div style={{ fontSize: 24, fontWeight: 800 }}>Teacher Panel</div>
+              <div style={{ marginTop: 8, color: "#475569" }}>
+                This version is simplified so it is easier to move into a normal React project for GitHub, Vercel, or Netlify.
+              </div>
+
+              <div style={{ display: "grid", gap: 14, marginTop: 20 }}>
+                {volcanoes.map((v) => {
+                  const isDone = completed.includes(v.id);
+                  return (
+                    <div key={v.id} style={{ borderRadius: 18, border: "1px solid #e2e8f0", background: "#f8fafc", padding: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 700 }}>{v.name}</div>
+                          <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>{v.region}</div>
+                        </div>
+                        <div
+                          style={{
+                            borderRadius: 999,
+                            padding: "6px 12px",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            background: isDone ? "#dcfce7" : "#e2e8f0",
+                            color: isDone ? "#15803d" : "#334155",
+                          }}
+                        >
+                          {isDone ? "Complete" : "Not started"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ borderRadius: 18, background: "#eff6ff", padding: 16, fontSize: 14, color: "#334155", marginTop: 20 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>GitHub-ready notes</div>
+                <ul style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>
+                  <li>This version no longer depends on shadcn/ui or path aliases.</li>
+                  <li>It only needs React, framer-motion, react-simple-maps, and lucide-react.</li>
+                  <li>That makes it much easier to paste into a standard Vite React project.</li>
+                </ul>
+              </div>
+            </div>
+          </CardBox>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
