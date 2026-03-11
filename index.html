@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Volcano Video Quiz App</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+    }
+    .page {
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .card {
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+    }
+    .pad-lg { padding: 28px; }
+    .pad-md { padding: 24px; }
+    .topbar, .split {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .subtitle {
+      margin-top: 10px;
+      font-size: 16px;
+      color: #475569;
+      max-width: 760px;
+    }
+    .btn {
+      border-radius: 16px;
+      border: none;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .btn:hover { filter: brightness(1.04); }
+    .btn:disabled {
+      background: #cbd5e1;
+      color: #475569;
+      cursor: not-allowed;
+    }
+    .btn-outline {
+      background: #fff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+    .progress-wrap { margin-top: 20px; margin-bottom: 18px; }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 8px;
+    }
+    .progress-track {
+      height: 12px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2563eb, #0ea5e9);
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .map-shell {
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid #cbd5e1;
+      background: linear-gradient(180deg,#dff3ff 0%,#cfe7ff 100%);
+      padding: 8px;
+      box-shadow: inset 0 2px 8px rgba(255,255,255,0.7);
+    }
+    .map-inner {
+      position: relative;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #d8f1ff 0%, #bddfff 100%);
+      overflow: auto;
+    }
+    .world-map {
+      width: 100%;
+      min-height: 520px;
+      display: block;
+    }
+    .marker-group {
+      cursor: pointer;
+    }
+    .marker-label {
+      position: absolute;
+      width: 150px;
+      padding: 8px 12px;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(15,23,42,0.14);
+      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(255,255,255,0.85);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      transform: translate(var(--dx, 18px), var(--dy, -18px));
+      cursor: pointer;
+    }
+    .marker-label.done {
+      background: rgba(240,253,244,0.96);
+      border-color: #86efac;
+    }
+    .marker-label .name { font-weight: 700; color: #0f172a; line-height: 1.1; }
+    .marker-label .region { font-size: 11px; color: #475569; line-height: 1.2; margin-top: 2px; }
+    .marker-label .state { margin-top: 4px; font-size: 11px; font-weight: 600; color: #64748b; }
+    .continent-label {
+      font-size: 12px;
+      font-weight: 700;
+      fill: rgba(15,23,42,0.55);
+      letter-spacing: 0.08em;
+    }
+    .ocean-label {
+      font-size: 12px;
+      font-weight: 700;
+      fill: rgba(15,23,42,0.35);
+      letter-spacing: 0.08em;
+    }
+    .note-box, .submit-box, .info-box {
+      border-radius: 18px;
+      background: #f1f5f9;
+      padding: 16px;
+      font-size: 14px;
+      color: #334155;
+    }
+    .video-card {
+      border-radius: 28px;
+      overflow: hidden;
+      background: #0f172a;
+      color: #fff;
+      box-shadow: 0 16px 40px rgba(15,23,42,0.16);
+    }
+    .video-inner {
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      background: radial-gradient(circle at top,#334155,#0f172a 60%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px;
+    }
+    .icon-xl { font-size: 56px; line-height: 1; }
+    .video-url { margin-top: 18px; font-size: 14px; color: #94a3b8; word-break: break-all; }
+    .row-card {
+      box-shadow: 0 12px 24px rgba(15,23,42,0.08);
+    }
+    .question-grid, .teacher-list { display: grid; gap: 16px; }
+    .question-card, .teacher-item {
+      border-radius: 18px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      padding: 16px;
+    }
+    .question-card {
+      background: #fff;
+      border: none;
+      box-shadow: 0 12px 24px rgba(15,23,42,0.08);
+      padding: 24px;
+    }
+    .question-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+    .text-input {
+      width: 100%;
+      height: 48px;
+      border-radius: 16px;
+      border: 1px solid #cbd5e1;
+      padding: 0 14px;
+      font-size: 16px;
+      outline: none;
+    }
+    .teacher-status {
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .teacher-status.done {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .done-screen {
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 32px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      padding: 32px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(15,23,42,0.10);
+    }
+    .done-icon { font-size: 62px; margin-bottom: 16px; }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .mt-8 { margin-top: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .mt-20 { margin-top: 20px; }
+    .mt-24 { margin-top: 24px; }
+    .mt-4 { margin-top: 4px; }
+    .muted { color: #475569; }
+    .small { font-size: 14px; }
+    .hidden { display: none !important; }
+    @media (max-width: 980px) {
+      .container { grid-template-columns: 1fr; }
+      .title { font-size: 26px; }
+      .world-map { min-height: 420px; }
+      .marker-label { width: 132px; transform: translate(var(--dx, 14px), var(--dy, -14px)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="container">
+      <div class="card">
+        <div class="pad-lg">
+          <div class="topbar">
+            <div>
+              <div class="title">🌋 Volcano Video Map Activity</div>
+              <div class="subtitle">Students select one of five volcano locations, watch the video, answer three questions, and return to the map until all five are complete.</div>
+            </div>
+            <button id="resetTop" class="btn btn-outline">↻ Reset</button>
+          </div>
+
+          <div class="progress-wrap">
+            <div class="progress-labels">
+              <span>Progress</span>
+              <span id="progressText">0 / 5 complete</span>
+            </div>
+            <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          </div>
+
+          <section id="panel-map" class="panel active">
+            <div class="map-shell">
+              <div class="map-inner">
+                <svg id="worldMap" class="world-map" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid meet" aria-label="World map with volcano locations">
+                  <!-- Realistic world map background -->
+                  <image href="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/2000px-World_map_-_low_resolution.svg.png" x="0" y="0" width="1000" height="520" preserveAspectRatio="xMidYMid slice" />
+
+                  <!-- Slight translucent ocean overlay for readability -->
+                  <rect x="0" y="0" width="1000" height="520" fill="rgba(255,255,255,0.05)"></rect>
+
+                  <!-- Layer where volcano markers are drawn by JavaScript -->
+                  <g id="markersLayer"></g>
+                </svg>
+              </div>
+            </div>
+            <div class="note-box mt-12">Click a map marker to begin. Finished locations are marked complete and cannot be reopened unless you reset the activity.</div>
+          </section>
+
+          <section id="panel-video" class="panel">
+            <div class="split">
+              <div>
+                <h2 id="videoTitle" style="font-size:30px;line-height:1.1;margin:0"></h2>
+                <p class="muted mt-8" style="margin-bottom:0">Watch the assigned video before moving to the questions.</p>
+              </div>
+              <button id="backToMapFromVideo" class="btn btn-outline">Back to map</button>
+            </div>
+
+            <div class="video-card mt-12">
+              <div class="video-inner">
+                <div class="icon-xl">▶</div>
+                <h3 style="font-size:32px;margin:0">Open the assigned video</h3>
+                <p class="mt-12" style="max-width:720px;color:#cbd5e1">Some browsers or preview environments block embedded YouTube playback. Use the button below to open the video directly in YouTube in a new tab.</p>
+                <div class="mt-24">
+                  <a id="videoLinkButton" href="#" target="_blank" rel="noreferrer" class="btn" style="background:#fff;color:#0f172a">▶ Open video in YouTube</a>
+                </div>
+                <p id="videoUrlText" class="video-url"></p>
+              </div>
+            </div>
+
+            <div class="card row-card mt-12">
+              <div class="pad-md split" style="align-items:center">
+                <div>
+                  <div style="font-weight:700">Ready for the questions?</div>
+                  <div class="small muted mt-4">Check the box after the student has watched the video.</div>
+                </div>
+                <div class="split" style="align-items:center">
+                  <label class="check-row"><input id="videoWatchedCheck" type="checkbox" /> Video watched</label>
+                  <button id="continueToQuestions" class="btn" disabled>Continue to questions</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="panel-questions" class="panel">
+            <div class="split">
+              <div>
+                <h2 id="questionsTitle" style="font-size:30px;line-height:1.1;margin:0"></h2>
+                <p class="muted mt-8" style="margin-bottom:0">Answer all three questions to finish this location.</p>
+              </div>
+              <button id="backToVideo" class="btn btn-outline">Back to video</button>
+            </div>
+
+            <div id="questionsContainer" class="question-grid mt-12"></div>
+
+            <div class="submit-box mt-12 split" style="align-items:center">
+              <div>When submitted, this location will be marked complete and the student will return to the main map.</div>
+              <button id="submitLocation" class="btn" disabled>Submit location</button>
+            </div>
+          </section>
+
+          <section id="panel-done" class="panel">
+            <div class="done-screen">
+              <div class="done-icon">✅</div>
+              <h2 style="font-size:36px;margin:0">All volcano locations completed</h2>
+              <p class="mt-12 muted" style="max-width:720px">The student has watched all five videos and answered every question set. Use reset to run the activity again.</p>
+              <div class="mt-24">
+                <button id="startOver" class="btn">Start over</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="pad-md">
+          <div style="font-size:24px;font-weight:800">Teacher Panel</div>
+          <div class="muted mt-8">This version is a single HTML file, so it is much easier to upload directly to GitHub Pages.</div>
+
+          <div class="split mt-20" style="align-items:center">
+            <button id="exportTxt" class="btn btn-outline">⬇ Export answers (.txt)</button>
+            <button id="exportCsv" class="btn btn-outline">⬇ Export answers (.csv)</button>
+          </div>
+
+          <div id="teacherList" class="teacher-list mt-20"></div>
+
+          <div class="info-box mt-20" style="background:#eff6ff">
+            <div style="font-weight:700;margin-bottom:8px">Single-file notes</div>
+            <ul style="margin:0;padding-left:20px;display:grid;gap:6px">
+              <li>No React, build step, or npm install required.</li>
+              <li>Upload this file as <code>index.html</code> to your GitHub Pages repo.</li>
+              <li>Edit volcano names, video links, questions, or coordinates in the JavaScript block near the bottom.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const volcanoes = [
+      {
+        id: "rainier",
+        name: "Mt. Rainier",
+        region: "Washington, USA",
+        video: "https://youtu.be/fOQit0tDoIg",
+        coordinates: [-121.7603, 46.8523],
+        labelOffset: [18, -26],
+        questions: [
+          "What volcanic hazard discussed in the video could affect nearby communities?",
+          "Why is Mt. Rainier considered dangerous even when it is not erupting?",
+          "What is one preparedness step people can take in areas around Mt. Rainier?"
+        ]
+      },
+      {
+        id: "hawaii",
+        name: "Hawaii",
+        region: "Hawaiian Islands, USA",
+        video: "https://youtu.be/h_65yAqD_T0",
+        coordinates: [-155.292, 19.421],
+        labelOffset: [18, 6],
+        questions: [
+          "What type of volcanic activity is commonly associated with Hawaii?",
+          "How does Hawaiian lava typically affect people, land, or infrastructure?",
+          "What did you learn from the video about how eruptions in Hawaii differ from explosive eruptions?"
+        ]
+      },
+      {
+        id: "ruiz",
+        name: "Nevado del Ruiz",
+        region: "Colombia",
+        video: "https://youtu.be/rvHW917msMc",
+        coordinates: [-75.322, 4.892],
+        labelOffset: [18, -18],
+        questions: [
+          "What major hazard made Nevado del Ruiz especially deadly?",
+          "How did snow and ice contribute to the disaster described in the video?",
+          "What lesson does this eruption teach about warning systems and evacuation?"
+        ]
+      },
+      {
+        id: "pinatubo",
+        name: "Mt. Pinatubo",
+        region: "Philippines",
+        video: "https://youtu.be/JO6l7vK_3xs",
+        coordinates: [120.349, 15.142],
+        labelOffset: [18, -16],
+        questions: [
+          "What happened during the Pinatubo eruption that made it globally significant?",
+          "What hazards affected people closest to the volcano?",
+          "How did monitoring and evacuation efforts help reduce loss of life?"
+        ]
+      },
+      {
+        id: "fuji",
+        name: "Mt. Fuji",
+        region: "Japan",
+        video: "https://youtu.be/DXKsVVebxo8",
+        coordinates: [138.7274, 35.3606],
+        labelOffset: [18, -34],
+        questions: [
+          "Why is Mt. Fuji important to monitor even though it has not erupted recently?",
+          "What hazards could an eruption of Mt. Fuji create for nearby populations?",
+          "What detail from the video stood out to you most about Fuji?"
+        ]
+      }
+    ];
+
+    const state = {
+      step: "map",
+      selectedId: null,
+      completed: [],
+      answers: Object.fromEntries(volcanoes.map(v => [v.id, ["", "", ""]])),
+      videoChecked: false
+    };
+
+    const panelMap = document.getElementById("panel-map");
+    const panelVideo = document.getElementById("panel-video");
+    const panelQuestions = document.getElementById("panel-questions");
+    const panelDone = document.getElementById("panel-done");
+    const progressText = document.getElementById("progressText");
+    const progressBar = document.getElementById("progressBar");
+    const markersLayer = document.getElementById("markersLayer");
+    const teacherList = document.getElementById("teacherList");
+    const videoTitle = document.getElementById("videoTitle");
+    const videoLinkButton = document.getElementById("videoLinkButton");
+    const videoUrlText = document.getElementById("videoUrlText");
+    const videoWatchedCheck = document.getElementById("videoWatchedCheck");
+    const continueToQuestions = document.getElementById("continueToQuestions");
+    const questionsTitle = document.getElementById("questionsTitle");
+    const questionsContainer = document.getElementById("questionsContainer");
+    const submitLocationBtn = document.getElementById("submitLocation");
+    const exportTxtBtn = document.getElementById("exportTxt");
+    const exportCsvBtn = document.getElementById("exportCsv");
+
+    function selectedVolcano() {
+      return volcanoes.find(v => v.id === state.selectedId) || null;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function progressPercent() {
+      return Math.round((state.completed.length / volcanoes.length) * 100);
+    }
+
+    function project(lon, lat) {
+      const x = ((lon + 180) / 360) * 1000;
+      const latRad = (lat * Math.PI) / 180;
+      const mercN = Math.log(Math.tan((Math.PI / 4) + (latRad / 2)));
+      const y = 260 - (1000 * mercN / (2 * Math.PI));
+      return { x, y: Math.max(30, Math.min(490, y)) };
+    }
+
+    function setStep(step) {
+      state.step = step;
+      panelMap.classList.toggle("active", step === "map");
+      panelVideo.classList.toggle("active", step === "video");
+      panelQuestions.classList.toggle("active", step === "questions");
+      panelDone.classList.toggle("active", step === "done");
+      render();
+    }
+
+    function chooseVolcano(id) {
+      if (state.completed.includes(id)) return;
+      state.selectedId = id;
+      state.videoChecked = false;
+      setStep("video");
+    }
+
+    function resetApp() {
+      state.step = "map";
+      state.selectedId = null;
+      state.completed = [];
+      state.answers = Object.fromEntries(volcanoes.map(v => [v.id, ["", "", ""]]));
+      state.videoChecked = false;
+      setStep("map");
+    }
+
+    function canSubmitCurrent() {
+      const volcano = selectedVolcano();
+      if (!volcano) return false;
+      return state.answers[volcano.id].every(a => a.trim().length > 0);
+    }
+
+    function submitLocation() {
+      const volcano = selectedVolcano();
+      if (!volcano || !canSubmitCurrent()) return;
+      if (!state.completed.includes(volcano.id)) state.completed.push(volcano.id);
+      if (state.completed.length === volcanoes.length) {
+        setStep("done");
+      } else {
+        state.selectedId = null;
+        state.videoChecked = false;
+        setStep("map");
+      }
+    }
+
+    function renderMarkers() {
+      markersLayer.innerHTML = "";
+      volcanoes.forEach(v => {
+        const { x, y } = project(v.coordinates[0], v.coordinates[1]);
+        const done = state.completed.includes(v.id);
+
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        group.setAttribute("transform", `translate(${x}, ${y})`);
+        group.setAttribute("class", "marker-group");
+        if (!done) group.addEventListener("click", () => chooseVolcano(v.id));
+
+        const pin = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        pin.setAttribute("d", "M12 0C5.4 0 0 5.4 0 12c0 8.7 12 24 12 24s12-15.3 12-24C24 5.4 18.6 0 12 0z");
+        pin.setAttribute("fill", done ? "#16a34a" : "#dc2626");
+        pin.setAttribute("stroke", "white");
+        pin.setAttribute("stroke-width", "2");
+        pin.setAttribute("transform", "translate(-12, -28)");
+
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", "0");
+        circle.setAttribute("cy", "-16");
+        circle.setAttribute("r", "4.5");
+        circle.setAttribute("fill", "white");
+
+        const foreign = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+        foreign.setAttribute("x", "14");
+        foreign.setAttribute("y", "-14");
+        foreign.setAttribute("width", "170");
+        foreign.setAttribute("height", "74");
+
+        const label = document.createElement("button");
+        label.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+        label.className = `marker-label ${done ? "done" : ""}`;
+        label.disabled = done;
+        const [dx, dy] = v.labelOffset || [18, -18];
+        label.style.setProperty("--dx", `${dx}px`);
+        label.style.setProperty("--dy", `${dy}px`);
+        label.innerHTML = `
+          <div class="name">${escapeHtml(v.name)}</div>
+          <div class="region">${escapeHtml(v.region)}</div>
+          <div class="state">${done ? "Completed" : "Open activity"}</div>
+        `;
+        if (!done) label.addEventListener("click", (e) => { e.stopPropagation(); chooseVolcano(v.id); });
+
+        foreign.appendChild(label);
+        group.appendChild(pin);
+        group.appendChild(circle);
+        group.appendChild(foreign);
+        markersLayer.appendChild(group);
+      });
+    }
+
+    function renderTeacherPanel() {
+      teacherList.innerHTML = "";
+      volcanoes.forEach(v => {
+        const done = state.completed.includes(v.id);
+        const item = document.createElement("div");
+        item.className = "teacher-item";
+        item.innerHTML = `
+          <div class="split" style="align-items:center">
+            <div>
+              <div style="font-weight:700">${escapeHtml(v.name)}</div>
+              <div class="small muted mt-4">${escapeHtml(v.region)}</div>
+            </div>
+            <div class="teacher-status ${done ? "done" : ""}">${done ? "Complete" : "Not started"}</div>
+          </div>
+        `;
+        teacherList.appendChild(item);
+      });
+    }
+
+    function renderVideoPanel() {
+      const volcano = selectedVolcano();
+      if (!volcano) return;
+      videoTitle.textContent = volcano.name;
+      videoLinkButton.href = volcano.video;
+      videoUrlText.textContent = volcano.video;
+      videoWatchedCheck.checked = state.videoChecked;
+      continueToQuestions.disabled = !state.videoChecked;
+    }
+
+    function renderQuestionsPanel() {
+      const volcano = selectedVolcano();
+      if (!volcano) return;
+      questionsTitle.textContent = `${volcano.name} Questions`;
+      questionsContainer.innerHTML = "";
+      volcano.questions.forEach((question, idx) => {
+        const card = document.createElement("div");
+        card.className = "question-card";
+        const value = state.answers[volcano.id][idx] || "";
+        card.innerHTML = `
+          <div class="question-title">${idx + 1}. ${escapeHtml(question)}</div>
+          <input class="text-input" type="text" placeholder="Type the student's response here" value="${escapeHtml(value)}" data-index="${idx}" />
+        `;
+        const input = card.querySelector("input");
+        input.addEventListener("input", (e) => {
+          state.answers[volcano.id][idx] = e.target.value;
+          submitLocationBtn.disabled = !canSubmitCurrent();
+        });
+        questionsContainer.appendChild(card);
+      });
+      submitLocationBtn.disabled = !canSubmitCurrent();
+    }
+
+    function buildExportRows() {
+      return volcanoes.map(v => ({
+        name: v.name,
+        region: v.region,
+        completed: state.completed.includes(v.id) ? "Yes" : "No",
+        video: v.video,
+        q1: state.answers[v.id][0] || "",
+        q2: state.answers[v.id][1] || "",
+        q3: state.answers[v.id][2] || ""
+      }));
+    }
+
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportAnswersTxt() {
+      const lines = [];
+      lines.push("Volcano Video Quiz - Student Answers");
+      lines.push(`Exported: ${new Date().toLocaleString()}`);
+      lines.push("");
+      buildExportRows().forEach((row, idx) => {
+        lines.push(`${idx + 1}. ${row.name} (${row.region})`);
+        lines.push(`Completed: ${row.completed}`);
+        lines.push(`Video: ${row.video}`);
+        lines.push(`Question 1: ${row.q1 || "[No answer]"}`);
+        lines.push(`Question 2: ${row.q2 || "[No answer]"}`);
+        lines.push(`Question 3: ${row.q3 || "[No answer]"}`);
+        lines.push("");
+      });
+      downloadFile("volcano-video-quiz-answers.txt", lines.join("
+"), "text/plain;charset=utf-8");
+    }
+
+    function csvEscape(value) {
+      const text = String(value ?? "");
+      return `"${text.replaceAll('"', '""')}"`;
+    }
+
+    function exportAnswersCsv() {
+      const rows = buildExportRows();
+      const header = ["Volcano", "Region", "Completed", "Video URL", "Question 1", "Question 2", "Question 3"];
+      const csvLines = [header.map(csvEscape).join(",")];
+      rows.forEach((row) => {
+        csvLines.push([
+          row.name,
+          row.region,
+          row.completed,
+          row.video,
+          row.q1,
+          row.q2,
+          row.q3
+        ].map(csvEscape).join(","));
+      });
+      downloadFile("volcano-video-quiz-answers.csv", csvLines.join("
+"), "text/csv;charset=utf-8");
+    }
+
+    function render() {
+      progressText.textContent = `${state.completed.length} / ${volcanoes.length} complete`;
+      progressBar.style.width = `${progressPercent()}%`;
+      renderMarkers();
+      renderTeacherPanel();
+      if (state.step === "video") renderVideoPanel();
+      if (state.step === "questions") renderQuestionsPanel();
+    }
+
+    document.getElementById("resetTop").addEventListener("click", resetApp);
+    document.getElementById("startOver").addEventListener("click", resetApp);
+    document.getElementById("backToMapFromVideo").addEventListener("click", () => setStep("map"));
+    document.getElementById("backToVideo").addEventListener("click", () => setStep("video"));
+    videoWatchedCheck.addEventListener("change", (e) => {
+      state.videoChecked = e.target.checked;
+      continueToQuestions.disabled = !state.videoChecked;
+    });
+    continueToQuestions.addEventListener("click", () => {
+      if (state.videoChecked) setStep("questions");
+    });
+    submitLocationBtn.addEventListener("click", submitLocation);
+    exportTxtBtn.addEventListener("click", exportAnswersTxt);
+    exportCsvBtn.addEventListener("click", exportAnswersCsv);
+
+    render();
+  </script>
+</body>
+</html>
