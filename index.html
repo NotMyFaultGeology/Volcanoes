@@ -1,893 +1,729 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-
-const volcanoes = [
-  {
-    id: "rainier",
-    name: "Mt. Rainier",
-    region: "Washington, USA",
-    video: "https://youtu.be/fOQit0tDoIg",
-    coordinates: [-121.7603, 46.8523],
-    labelOffset: [18, -26],
-    questions: [
-      "What volcanic hazard discussed in the video could affect nearby communities?",
-      "Why is Mt. Rainier considered dangerous even when it is not erupting?",
-      "What is one preparedness step people can take in areas around Mt. Rainier?",
-    ],
-  },
-  {
-    id: "hawaii",
-    name: "Hawaii",
-    region: "Hawaiian Islands, USA",
-    video: "https://youtu.be/h_65yAqD_T0",
-    coordinates: [-155.292, 19.421],
-    labelOffset: [18, 6],
-    questions: [
-      "What type of volcanic activity is commonly associated with Hawaii?",
-      "How does Hawaiian lava typically affect people, land, or infrastructure?",
-      "What did you learn from the video about how eruptions in Hawaii differ from explosive eruptions?",
-    ],
-  },
-  {
-    id: "ruiz",
-    name: "Nevado del Ruiz",
-    region: "Colombia",
-    video: "https://youtu.be/rvHW917msMc",
-    coordinates: [-75.322, 4.892],
-    labelOffset: [18, -18],
-    questions: [
-      "What major hazard made Nevado del Ruiz especially deadly?",
-      "How did snow and ice contribute to the disaster described in the video?",
-      "What lesson does this eruption teach about warning systems and evacuation?",
-    ],
-  },
-  {
-    id: "pinatubo",
-    name: "Mt. Pinatubo",
-    region: "Philippines",
-    video: "https://youtu.be/JO6l7vK_3xs",
-    coordinates: [120.349, 15.142],
-    labelOffset: [18, -16],
-    questions: [
-      "What happened during the Pinatubo eruption that made it globally significant?",
-      "What hazards affected people closest to the volcano?",
-      "How did monitoring and evacuation efforts help reduce loss of life?",
-    ],
-  },
-  {
-    id: "fuji",
-    name: "Mt. Fuji",
-    region: "Japan",
-    video: "https://youtu.be/DXKsVVebxo8",
-    coordinates: [138.7274, 35.3606],
-    labelOffset: [18, -34],
-    questions: [
-      "Why is Mt. Fuji important to monitor even though it has not erupted recently?",
-      "What hazards could an eruption of Mt. Fuji create for nearby populations?",
-      "What detail from the video stood out to you most about Fuji?",
-    ],
-  },
-];
-
-const mapSrc =
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/2000px-World_map_-_low_resolution.svg.png";
-
-function project(lon, lat) {
-  const x = ((lon + 180) / 360) * 1000;
-  const latRad = (lat * Math.PI) / 180;
-  const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
-  const y = 260 - (1000 * mercN) / (2 * Math.PI);
-  return { x, y: Math.max(30, Math.min(490, y)) };
-}
-
-function csvEscape(value) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
-}
-
-function downloadFile(filename, content, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function baseButtonStyle(enabled = true) {
-  return {
-    borderRadius: 16,
-    border: "none",
-    background: enabled ? "#0f172a" : "#cbd5e1",
-    color: enabled ? "#fff" : "#475569",
-    padding: "12px 18px",
-    fontWeight: 700,
-    cursor: enabled ? "pointer" : "not-allowed",
-  };
-}
-
-function outlineButtonStyle() {
-  return {
-    borderRadius: 16,
-    border: "1px solid #cbd5e1",
-    background: "#fff",
-    color: "#0f172a",
-    padding: "12px 18px",
-    fontWeight: 700,
-    cursor: "pointer",
-  };
-}
-
-export default function VolcanoVideoQuizApp() {
-  const [step, setStep] = useState("map");
-  const [selectedId, setSelectedId] = useState(null);
-  const [completed, setCompleted] = useState([]);
-  const [answers, setAnswers] = useState(
-    Object.fromEntries(volcanoes.map((v) => [v.id, ["", "", ""]]))
-  );
-  const [videoChecked, setVideoChecked] = useState(false);
-  const [studentName, setStudentName] = useState("");
-  const [mapSize, setMapSize] = useState({ width: 1000, height: 520 });
-  const [isMobile, setIsMobile] = useState(false);
-  const mapRef = useRef(null);
-
-  const selected = useMemo(
-    () => volcanoes.find((v) => v.id === selectedId) || null,
-    [selectedId]
-  );
-
-  useEffect(() => {
-    const updateLayout = () => {
-      if (mapRef.current) {
-        const rect = mapRef.current.getBoundingClientRect();
-        setMapSize({ width: rect.width || 1000, height: rect.height || 520 });
-      }
-      setIsMobile(window.innerWidth < 980);
-    };
-
-    updateLayout();
-    window.addEventListener("resize", updateLayout);
-    return () => window.removeEventListener("resize", updateLayout);
-  }, []);
-
-  const progressPercent = Math.round((completed.length / volcanoes.length) * 100);
-
-  const chooseVolcano = (id) => {
-    if (completed.includes(id)) return;
-    setSelectedId(id);
-    setVideoChecked(false);
-    setStep("video");
-  };
-
-  const resetApp = () => {
-    setStep("map");
-    setSelectedId(null);
-    setCompleted([]);
-    setAnswers(Object.fromEntries(volcanoes.map((v) => [v.id, ["", "", ""]])));
-    setVideoChecked(false);
-    setStudentName("");
-  };
-
-  const canSubmit = selected ? answers[selected.id].every((a) => a.trim()) : false;
-
-  const submitLocation = () => {
-    if (!selected || !canSubmit) return;
-    const updated = completed.includes(selected.id)
-      ? completed
-      : [...completed, selected.id];
-    setCompleted(updated);
-
-    if (updated.length === volcanoes.length) {
-      setStep("done");
-    } else {
-      setSelectedId(null);
-      setVideoChecked(false);
-      setStep("map");
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Volcano Video Quiz</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
     }
-  };
-
-  const exportCsv = () => {
-    const rows = volcanoes.map((v) => ({
-      name: v.name,
-      region: v.region,
-      completed: completed.includes(v.id) ? "Yes" : "No",
-      video: v.video,
-      q1: answers[v.id][0] || "",
-      q2: answers[v.id][1] || "",
-      q3: answers[v.id][2] || "",
-    }));
-
-    const header = [
-      "Volcano",
-      "Region",
-      "Completed",
-      "Video URL",
-      "Question 1",
-      "Question 2",
-      "Question 3",
-    ];
-
-    const csvLines = [header.map(csvEscape).join(",")];
-    rows.forEach((row) => {
-      csvLines.push(
-        [row.name, row.region, row.completed, row.video, row.q1, row.q2, row.q3]
-          .map(csvEscape)
-          .join(",")
-      );
-    });
-
-    const cleaned =
-      (studentName || "student")
-        .trim()
-        .replace(/[^a-z0-9]/gi, "_")
-        .toLowerCase() || "student";
-
-    const now = new Date();
-    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(now.getDate()).padStart(2, "0")}_${String(
-      now.getHours()
-    ).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
-
-    downloadFile(
-      `volcano_report_${cleaned}_${timestamp}.csv`,
-      csvLines.join("
-"),
-      "text/csv;charset=utf-8"
-    );
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        padding: 24,
-        background: "#f8fafc",
-        color: "#0f172a",
-        fontFamily:
-          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1320,
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1.3fr) minmax(320px,0.7fr)",
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 24,
-            boxShadow: "0 16px 40px rgba(15,23,42,0.10)",
-          }}
-        >
-          <div style={{ padding: 28 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 16,
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    alignItems: "center",
-                    fontSize: 32,
-                    fontWeight: 800,
-                  }}
-                >
-                  🌋 Volcano Video Map Activity
-                </div>
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 16,
-                    color: "#475569",
-                    maxWidth: 760,
-                  }}
-                >
-                  Students select one of five volcano locations, watch the video, answer three questions, and return to the map until all five are complete.
-                </div>
-              </div>
-              <button onClick={resetApp} style={outlineButtonStyle()}>
-                ↻ Reset
-              </button>
+    .page { min-height: 100vh; padding: 24px; }
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .card {
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+    }
+    .pad-lg { padding: 28px; }
+    .pad-md { padding: 24px; }
+    .topbar, .split {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .subtitle {
+      margin-top: 10px;
+      font-size: 16px;
+      color: #475569;
+      max-width: 760px;
+    }
+    .btn {
+      border-radius: 16px;
+      border: none;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 18px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .btn:hover { filter: brightness(1.04); }
+    .btn:disabled {
+      background: #cbd5e1;
+      color: #475569;
+      cursor: not-allowed;
+    }
+    .btn-outline {
+      background: #fff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+    .progress-wrap { margin-top: 20px; margin-bottom: 18px; }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 8px;
+    }
+    .progress-track {
+      height: 12px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2563eb, #0ea5e9);
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .map-shell {
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid #cbd5e1;
+      background: linear-gradient(180deg,#dff3ff 0%,#cfe7ff 100%);
+      padding: 8px;
+      box-shadow: inset 0 2px 8px rgba(255,255,255,0.7);
+    }
+    .map-inner {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      min-height: 520px;
+      background: #dcefff;
+    }
+    .map-bg {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 520px;
+      object-fit: cover;
+    }
+    .marker-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .map-location {
+      position: absolute;
+      transform: translate(-12px, -28px);
+      z-index: 3;
+      pointer-events: auto;
+    }
+    .pin-btn {
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+    }
+    .pin-btn:disabled { cursor: default; }
+    .map-pin {
+      width: 24px;
+      height: 36px;
+      display: block;
+      filter: drop-shadow(0 3px 6px rgba(15,23,42,0.18));
+    }
+    .marker-label {
+      position: absolute;
+      width: 150px;
+      padding: 8px 12px;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(15,23,42,0.14);
+      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(255,255,255,0.85);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      cursor: pointer;
+      text-align: left;
+      pointer-events: auto;
+    }
+    .marker-label.done {
+      background: rgba(240,253,244,0.96);
+      border-color: #86efac;
+    }
+    .marker-label .name { font-weight: 700; color: #0f172a; line-height: 1.1; }
+    .marker-label .region { font-size: 11px; color: #475569; line-height: 1.2; margin-top: 2px; }
+    .marker-label .state { margin-top: 4px; font-size: 11px; font-weight: 600; color: #64748b; }
+    .note-box, .submit-box, .info-box {
+      border-radius: 18px;
+      background: #f1f5f9;
+      padding: 16px;
+      font-size: 14px;
+      color: #334155;
+    }
+    .video-card {
+      border-radius: 28px;
+      overflow: hidden;
+      background: #0f172a;
+      color: #fff;
+      box-shadow: 0 16px 40px rgba(15,23,42,0.16);
+    }
+    .video-inner {
+      aspect-ratio: 16 / 9;
+      width: 100%;
+      background: radial-gradient(circle at top,#334155,#0f172a 60%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px;
+    }
+    .icon-xl { font-size: 56px; line-height: 1; }
+    .video-url { margin-top: 18px; font-size: 14px; color: #94a3b8; word-break: break-all; }
+    .row-card { box-shadow: 0 12px 24px rgba(15,23,42,0.08); }
+    .question-grid, .student-report-list { display: grid; gap: 16px; }
+    .question-card, .student-report-item {
+      border-radius: 18px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      padding: 16px;
+    }
+    .question-card {
+      background: #fff;
+      border: none;
+      box-shadow: 0 12px 24px rgba(15,23,42,0.08);
+      padding: 24px;
+    }
+    .question-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+    .text-input {
+      width: 100%;
+      height: 48px;
+      border-radius: 16px;
+      border: 1px solid #cbd5e1;
+      padding: 0 14px;
+      font-size: 16px;
+      outline: none;
+    }
+    .report-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    .report-box {
+      border-radius: 18px;
+      background: #eff6ff;
+      padding: 16px;
+      font-size: 14px;
+      color: #334155;
+      margin-top: 20px;
+    }
+    .done-screen {
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 32px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      padding: 32px;
+      text-align: center;
+      box-shadow: 0 16px 40px rgba(15,23,42,0.10);
+    }
+    .done-icon { font-size: 62px; margin-bottom: 16px; }
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .mt-8 { margin-top: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .mt-20 { margin-top: 20px; }
+    .mt-24 { margin-top: 24px; }
+    .mt-4 { margin-top: 4px; }
+    .muted { color: #475569; }
+    .small { font-size: 14px; }
+    @media (max-width: 980px) {
+      .container { grid-template-columns: 1fr; }
+      .title { font-size: 26px; }
+      .marker-label { width: 132px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="container">
+      <div class="card">
+        <div class="pad-lg">
+          <div class="topbar">
+            <div>
+              <div class="title">🌋 Volcano Video Map Activity</div>
+              <div class="subtitle">Students select one of five volcano locations, watch the video, answer three questions, and return to the map until all five are complete.</div>
             </div>
-
-            <div style={{ marginTop: 20, marginBottom: 18 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 14,
-                  color: "#475569",
-                  marginBottom: 8,
-                }}
-              >
-                <span>Progress</span>
-                <span>
-                  {completed.length} / {volcanoes.length} complete
-                </span>
-              </div>
-              <div
-                style={{
-                  height: 12,
-                  borderRadius: 999,
-                  background: "#e2e8f0",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${progressPercent}%`,
-                    background: "linear-gradient(90deg, #2563eb, #0ea5e9)",
-                    borderRadius: 999,
-                    transition: "width 0.25s ease",
-                  }}
-                />
-              </div>
-            </div>
-
-            {step === "map" && (
-              <section>
-                <div
-                  style={{
-                    overflow: "hidden",
-                    borderRadius: 28,
-                    border: "1px solid #cbd5e1",
-                    background: "linear-gradient(180deg,#dff3ff 0%,#cfe7ff 100%)",
-                    padding: 8,
-                    boxShadow: "inset 0 2px 8px rgba(255,255,255,0.7)",
-                  }}
-                >
-                  <div
-                    ref={mapRef}
-                    style={{
-                      position: "relative",
-                      borderRadius: 24,
-                      overflow: "hidden",
-                      minHeight: 520,
-                      background: "#dcefff",
-                    }}
-                  >
-                    <img
-                      src={mapSrc}
-                      alt="World map"
-                      onLoad={() => {
-                        if (mapRef.current) {
-                          const rect = mapRef.current.getBoundingClientRect();
-                          setMapSize({ width: rect.width || 1000, height: rect.height || 520 });
-                        }
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        minHeight: 520,
-                        objectFit: "cover",
-                      }}
-                    />
-                    <div style={{ position: "absolute", inset: 0, zIndex: 2 }}>
-                      {volcanoes.map((v) => {
-                        const projected = project(v.coordinates[0], v.coordinates[1]);
-                        const x = (projected.x / 1000) * mapSize.width;
-                        const y = (projected.y / 520) * mapSize.height;
-                        const done = completed.includes(v.id);
-                        const [dx, dy] = v.labelOffset || [18, -18];
-
-                        return (
-                          <div
-                            key={v.id}
-                            style={{
-                              position: "absolute",
-                              left: x,
-                              top: y,
-                              transform: "translate(-12px, -28px)",
-                              zIndex: 3,
-                            }}
-                          >
-                            <button
-                              type="button"
-                              disabled={done}
-                              onClick={() => chooseVolcano(v.id)}
-                              style={{
-                                border: "none",
-                                background: "transparent",
-                                padding: 0,
-                                cursor: done ? "default" : "pointer",
-                              }}
-                            >
-                              <svg
-                                viewBox="0 0 24 36"
-                                style={{
-                                  width: 24,
-                                  height: 36,
-                                  display: "block",
-                                  filter: "drop-shadow(0 3px 6px rgba(15,23,42,0.18))",
-                                }}
-                                aria-hidden="true"
-                              >
-                                <path
-                                  d="M12 0C5.4 0 0 5.4 0 12c0 8.7 12 24 12 24s12-15.3 12-24C24 5.4 18.6 0 12 0z"
-                                  fill={done ? "#16a34a" : "#dc2626"}
-                                  stroke="white"
-                                  strokeWidth="2"
-                                />
-                                <circle cx="12" cy="12" r="4.5" fill="white" />
-                              </svg>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={done}
-                              onClick={() => chooseVolcano(v.id)}
-                              style={{
-                                position: "absolute",
-                                left: dx,
-                                top: dy,
-                                width: 150,
-                                padding: "8px 12px",
-                                borderRadius: 14,
-                                boxShadow: "0 8px 24px rgba(15,23,42,0.14)",
-                                background: done
-                                  ? "rgba(240,253,244,0.96)"
-                                  : "rgba(255,255,255,0.96)",
-                                border: `1px solid ${
-                                  done ? "#86efac" : "rgba(255,255,255,0.85)"
-                                }`,
-                                cursor: done ? "default" : "pointer",
-                                textAlign: "left",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontWeight: 700,
-                                  color: "#0f172a",
-                                  lineHeight: 1.1,
-                                }}
-                              >
-                                {v.name}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  color: "#475569",
-                                  lineHeight: 1.2,
-                                  marginTop: 2,
-                                }}
-                              >
-                                {v.region}
-                              </div>
-                              <div
-                                style={{
-                                  marginTop: 4,
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: "#64748b",
-                                }}
-                              >
-                                {done ? "Completed" : "Open activity"}
-                              </div>
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    borderRadius: 18,
-                    background: "#f1f5f9",
-                    padding: 16,
-                    fontSize: 14,
-                    color: "#334155",
-                    marginTop: 12,
-                  }}
-                >
-                  Click a map marker to begin. Finished locations are marked complete and cannot be reopened unless you reset the activity.
-                </div>
-              </section>
-            )}
-
-            {step === "video" && selected && (
-              <section>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>
-                      {selected.name}
-                    </h2>
-                    <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>
-                      Watch the assigned video before moving to the questions.
-                    </p>
-                  </div>
-                  <button onClick={() => setStep("map")} style={outlineButtonStyle()}>
-                    Back to map
-                  </button>
-                </div>
-
-                <div
-                  style={{
-                    borderRadius: 28,
-                    overflow: "hidden",
-                    background: "#0f172a",
-                    color: "#fff",
-                    boxShadow: "0 16px 40px rgba(15,23,42,0.16)",
-                    marginTop: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      aspectRatio: "16 / 9",
-                      width: "100%",
-                      background: "radial-gradient(circle at top,#334155,#0f172a 60%)",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                      padding: 32,
-                    }}
-                  >
-                    <div style={{ fontSize: 56, lineHeight: 1 }}>▶</div>
-                    <h3 style={{ fontSize: 32, margin: 0 }}>Open the assigned video</h3>
-                    <p style={{ marginTop: 12, maxWidth: 720, color: "#cbd5e1" }}>
-                      Some browsers or preview environments block embedded YouTube playback. Use the button below to open the video directly in YouTube in a new tab.
-                    </p>
-                    <div style={{ marginTop: 24 }}>
-                      <a
-                        href={selected.video}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          borderRadius: 16,
-                          background: "#fff",
-                          color: "#0f172a",
-                          padding: "12px 18px",
-                          fontWeight: 700,
-                          textDecoration: "none",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        ▶ Open video in YouTube
-                      </a>
-                    </div>
-                    <p
-                      style={{
-                        marginTop: 18,
-                        fontSize: 14,
-                        color: "#94a3b8",
-                        wordBreak: "break-all",
-                      }}
-                    >
-                      {selected.video}
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    background: "#fff",
-                    borderRadius: 24,
-                    boxShadow: "0 12px 24px rgba(15,23,42,0.08)",
-                    marginTop: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: 24,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 16,
-                      flexWrap: "wrap",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700 }}>Ready for the questions?</div>
-                      <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>
-                        Check the box after you have watched the video.
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                      <label
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          fontSize: 14,
-                          fontWeight: 600,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={videoChecked}
-                          onChange={(e) => setVideoChecked(e.target.checked)}
-                        />
-                        Video watched
-                      </label>
-                      <button
-                        disabled={!videoChecked}
-                        onClick={() => setStep("questions")}
-                        style={baseButtonStyle(videoChecked)}
-                      >
-                        Continue to questions
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {step === "questions" && selected && (
-              <section>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>
-                      {selected.name} Questions
-                    </h2>
-                    <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>
-                      Answer all three questions to finish this location.
-                    </p>
-                    <p
-                      style={{
-                        color: "#475569",
-                        fontSize: 14,
-                        marginTop: 8,
-                        marginBottom: 0,
-                      }}
-                    >
-                      A complete report of all questions will be generated for submission after all locations are completed.
-                    </p>
-                  </div>
-                  <button onClick={() => setStep("video")} style={outlineButtonStyle()}>
-                    Back to video
-                  </button>
-                </div>
-
-                <div style={{ display: "grid", gap: 16, marginTop: 12 }}>
-                  {selected.questions.map((question, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        background: "#fff",
-                        borderRadius: 18,
-                        boxShadow: "0 12px 24px rgba(15,23,42,0.08)",
-                        padding: 24,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 16,
-                          fontWeight: 700,
-                          color: "#0f172a",
-                          marginBottom: 12,
-                        }}
-                      >
-                        {idx + 1}. {question}
-                      </div>
-                      <input
-                        value={answers[selected.id][idx]}
-                        onChange={(e) =>
-                          setAnswers((prev) => ({
-                            ...prev,
-                            [selected.id]: prev[selected.id].map((a, i) =>
-                              i === idx ? e.target.value : a
-                            ),
-                          }))
-                        }
-                        style={{
-                          width: "100%",
-                          height: 48,
-                          borderRadius: 16,
-                          border: "1px solid #cbd5e1",
-                          padding: "0 14px",
-                          fontSize: 16,
-                          outline: "none",
-                        }}
-                        type="text"
-                        placeholder="Type your response here"
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    borderRadius: 18,
-                    background: "#f1f5f9",
-                    padding: 16,
-                    fontSize: 14,
-                    color: "#334155",
-                    marginTop: 12,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    When submitted, this location will be marked complete and you will return to the main map.
-                  </div>
-                  <button
-                    disabled={!canSubmit}
-                    onClick={submitLocation}
-                    style={baseButtonStyle(canSubmit)}
-                  >
-                    Submit location
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {step === "done" && (
-              <section>
-                <div
-                  style={{
-                    minHeight: 420,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: 32,
-                    border: "1px solid #e2e8f0",
-                    background: "#fff",
-                    padding: 32,
-                    textAlign: "center",
-                    boxShadow: "0 16px 40px rgba(15,23,42,0.10)",
-                  }}
-                >
-                  <div style={{ fontSize: 62, marginBottom: 16 }}>✅</div>
-                  <h2 style={{ fontSize: 36, margin: 0 }}>All volcano locations completed</h2>
-                  <div style={{ marginTop: 14, maxWidth: 420, width: "100%" }}>
-                    <input
-                      value={studentName}
-                      onChange={(e) => setStudentName(e.target.value)}
-                      style={{
-                        width: "100%",
-                        height: 48,
-                        borderRadius: 16,
-                        border: "1px solid #cbd5e1",
-                        padding: "0 14px",
-                        fontSize: 16,
-                        outline: "none",
-                      }}
-                      placeholder="Enter your name for the report filename"
-                    />
-                  </div>
-                  <p style={{ marginTop: 12, maxWidth: 720, color: "#475569" }}>
-                    You have watched all five videos and answered every question set. Generate your report below and submit the downloaded .csv file to Canvas.
-                  </p>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 20 }}>
-                    <button onClick={exportCsv} style={baseButtonStyle(true)}>
-                      ⬇ Download report (.csv)
-                    </button>
-                  </div>
-                  <div
-                    style={{
-                      borderRadius: 18,
-                      background: "#eff6ff",
-                      padding: 16,
-                      fontSize: 14,
-                      color: "#334155",
-                      marginTop: 20,
-                    }}
-                  >
-                    Submit your downloaded .csv file to Canvas.
-                  </div>
-                  <div style={{ marginTop: 24 }}>
-                    <button onClick={resetApp} style={baseButtonStyle(true)}>
-                      Start over
-                    </button>
-                  </div>
-                </div>
-              </section>
-            )}
+            <button id="resetTop" class="btn btn-outline">↻ Reset</button>
           </div>
-        </div>
 
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 24,
-            boxShadow: "0 16px 40px rgba(15,23,42,0.10)",
-          }}
-        >
-          <div style={{ padding: 24 }}>
-            <div style={{ fontSize: 24, fontWeight: 800 }}>Student Report</div>
-            <div style={{ color: "#475569", marginTop: 8 }}>
-              When you finish all five volcanoes, download your report and submit the .csv file to Canvas.
+          <div class="progress-wrap">
+            <div class="progress-labels">
+              <span>Progress</span>
+              <span id="progressText">0 / 5 complete</span>
             </div>
-            <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
-              {volcanoes.map((v) => {
-                const done = completed.includes(v.id);
-                return (
-                  <div
-                    key={v.id}
-                    style={{
-                      borderRadius: 18,
-                      border: "1px solid #e2e8f0",
-                      background: "#f8fafc",
-                      padding: 16,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{v.name}</div>
-                        <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>
-                          {v.region}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: done ? "#15803d" : "#334155",
-                          background: done ? "#dcfce7" : "#e2e8f0",
-                          borderRadius: 999,
-                          padding: "6px 12px",
-                        }}
-                      >
-                        {done ? "Ready for report" : "In progress"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          </div>
+
+          <section id="panel-map" class="panel active">
+            <div class="map-shell">
+              <div class="map-inner" id="mapInner">
+                <img id="mapBg" class="map-bg" src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/2000px-World_map_-_low_resolution.svg.png" alt="World map" />
+                <div id="markerOverlay" class="marker-overlay"></div>
+              </div>
             </div>
-            <div
-              style={{
-                borderRadius: 18,
-                background: "#eff6ff",
-                padding: 16,
-                fontSize: 14,
-                color: "#334155",
-                marginTop: 20,
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>Single-file notes</div>
-              <ul style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>
-                <li>No React build step is needed in canvas preview.</li>
-                <li>Students can complete five locations, then download one CSV report.</li>
-                <li>You can still copy this into a standalone site later if needed.</li>
-              </ul>
+            <div class="note-box mt-12">Click a map marker to begin. Finished locations are marked complete and cannot be reopened unless you reset the activity.</div>
+          </section>
+
+          <section id="panel-video" class="panel">
+            <div class="split">
+              <div>
+                <h2 id="videoTitle" style="font-size:30px;line-height:1.1;margin:0"></h2>
+                <p class="muted mt-8" style="margin-bottom:0">Watch the assigned video before moving to the questions.</p>
+              </div>
+              <button id="backToMapFromVideo" class="btn btn-outline">Back to map</button>
             </div>
+
+            <div class="video-card mt-12">
+              <div class="video-inner">
+                <div class="icon-xl">▶</div>
+                <h3 style="font-size:32px;margin:0">Open the assigned video</h3>
+                <p class="mt-12" style="max-width:720px;color:#cbd5e1">Some browsers or preview environments block embedded YouTube playback. Use the button below to open the video directly in YouTube in a new tab.</p>
+                <div class="mt-24">
+                  <a id="videoLinkButton" href="#" target="_blank" rel="noreferrer" class="btn" style="background:#fff;color:#0f172a">▶ Open video in YouTube</a>
+                </div>
+                <p id="videoUrlText" class="video-url"></p>
+              </div>
+            </div>
+
+            <div class="card row-card mt-12">
+              <div class="pad-md split" style="align-items:center">
+                <div>
+                  <div style="font-weight:700">Ready for the questions?</div>
+                  <div class="small muted mt-4">Check the box after you have watched the video.</div>
+                </div>
+                <div class="split" style="align-items:center">
+                  <label class="check-row"><input id="videoWatchedCheck" type="checkbox" /> Video watched</label>
+                  <button id="continueToQuestions" class="btn" disabled>Continue to questions</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="panel-questions" class="panel">
+            <div class="split">
+              <div>
+                <h2 id="questionsTitle" style="font-size:30px;line-height:1.1;margin:0"></h2>
+                <p class="muted mt-8" style="margin-bottom:0">Answer all three questions to finish this location.</p>
+                <p class="small muted mt-8">A complete report of all questions will be generated for submission after all locations are completed.</p>
+              </div>
+              <button id="backToVideo" class="btn btn-outline">Back to video</button>
+            </div>
+
+            <div id="questionsContainer" class="question-grid mt-12"></div>
+
+            <div class="submit-box mt-12 split" style="align-items:center">
+              <div>When submitted, this location will be marked complete and you will return to the main map.</div>
+              <button id="submitLocation" class="btn" disabled>Submit location</button>
+            </div>
+          </section>
+
+          <section id="panel-done" class="panel">
+            <div class="done-screen">
+              <div class="done-icon">✅</div>
+              <h2 style="font-size:36px;margin:0">All volcano locations completed</h2>
+              <div style="margin-top:14px;max-width:420px;width:100%">
+                <input id="studentName" class="text-input" placeholder="Enter your name for the report filename" />
+              </div>
+              <p class="mt-12 muted" style="max-width:720px">You have watched all five videos and answered every question set. Generate your report below and submit the downloaded .csv file to Canvas.</p>
+              <div class="report-actions">
+                <button id="downloadReportCsv" class="btn">⬇ Download report (.csv)</button>
+              </div>
+              <div class="report-box">Submit your downloaded .csv file to Canvas.</div>
+              <div class="mt-24">
+                <button id="startOver" class="btn">Start over</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="pad-md">
+          <div style="font-size:24px;font-weight:800">Student Report</div>
+          <div class="muted mt-8">When you finish all five volcanoes, download your report and submit the .csv file to Canvas.</div>
+          <div id="studentReportList" class="student-report-list mt-20"></div>
+          <div class="info-box mt-20" style="background:#eff6ff">
+            <div style="font-weight:700;margin-bottom:8px">Single-file notes</div>
+            <ul style="margin:0;padding-left:20px;display:grid;gap:6px">
+              <li>Upload this file as <code>index.html</code> to your GitHub Pages repo.</li>
+              <li>Students can complete five locations, then download one CSV report.</li>
+              <li>No React build step is required for this version.</li>
+            </ul>
           </div>
         </div>
       </div>
     </div>
-  );
-}
+  </div>
+
+  <script>
+    const volcanoes = [
+      {
+        id: "rainier",
+        name: "Mt. Rainier",
+        region: "Washington, USA",
+        video: "https://youtu.be/fOQit0tDoIg",
+        coordinates: [-121.7603, 46.8523],
+        labelOffset: [18, -26],
+        questions: [
+          "What volcanic hazard discussed in the video could affect nearby communities?",
+          "Why is Mt. Rainier considered dangerous even when it is not erupting?",
+          "What is one preparedness step people can take in areas around Mt. Rainier?"
+        ]
+      },
+      {
+        id: "hawaii",
+        name: "Hawaii",
+        region: "Hawaiian Islands, USA",
+        video: "https://youtu.be/h_65yAqD_T0",
+        coordinates: [-155.292, 19.421],
+        labelOffset: [18, 6],
+        questions: [
+          "What type of volcanic activity is commonly associated with Hawaii?",
+          "How does Hawaiian lava typically affect people, land, or infrastructure?",
+          "What did you learn from the video about how eruptions in Hawaii differ from explosive eruptions?"
+        ]
+      },
+      {
+        id: "ruiz",
+        name: "Nevado del Ruiz",
+        region: "Colombia",
+        video: "https://youtu.be/rvHW917msMc",
+        coordinates: [-75.322, 4.892],
+        labelOffset: [18, -18],
+        questions: [
+          "What major hazard made Nevado del Ruiz especially deadly?",
+          "How did snow and ice contribute to the disaster described in the video?",
+          "What lesson does this eruption teach about warning systems and evacuation?"
+        ]
+      },
+      {
+        id: "pinatubo",
+        name: "Mt. Pinatubo",
+        region: "Philippines",
+        video: "https://youtu.be/JO6l7vK_3xs",
+        coordinates: [120.349, 15.142],
+        labelOffset: [18, -16],
+        questions: [
+          "What happened during the Pinatubo eruption that made it globally significant?",
+          "What hazards affected people closest to the volcano?",
+          "How did monitoring and evacuation efforts help reduce loss of life?"
+        ]
+      },
+      {
+        id: "fuji",
+        name: "Mt. Fuji",
+        region: "Japan",
+        video: "https://youtu.be/DXKsVVebxo8",
+        coordinates: [138.7274, 35.3606],
+        labelOffset: [18, -34],
+        questions: [
+          "Why is Mt. Fuji important to monitor even though it has not erupted recently?",
+          "What hazards could an eruption of Mt. Fuji create for nearby populations?",
+          "What detail from the video stood out to you most about Fuji?"
+        ]
+      }
+    ];
+
+    const state = {
+      step: "map",
+      selectedId: null,
+      completed: [],
+      answers: Object.fromEntries(volcanoes.map(v => [v.id, ["", "", ""]])),
+      videoChecked: false,
+      studentName: ""
+    };
+
+    const panelMap = document.getElementById("panel-map");
+    const panelVideo = document.getElementById("panel-video");
+    const panelQuestions = document.getElementById("panel-questions");
+    const panelDone = document.getElementById("panel-done");
+    const progressText = document.getElementById("progressText");
+    const progressBar = document.getElementById("progressBar");
+    const markerOverlay = document.getElementById("markerOverlay");
+    const mapInner = document.getElementById("mapInner");
+    const mapBg = document.getElementById("mapBg");
+    const studentReportList = document.getElementById("studentReportList");
+    const videoTitle = document.getElementById("videoTitle");
+    const videoLinkButton = document.getElementById("videoLinkButton");
+    const videoUrlText = document.getElementById("videoUrlText");
+    const videoWatchedCheck = document.getElementById("videoWatchedCheck");
+    const continueToQuestions = document.getElementById("continueToQuestions");
+    const questionsTitle = document.getElementById("questionsTitle");
+    const questionsContainer = document.getElementById("questionsContainer");
+    const submitLocationBtn = document.getElementById("submitLocation");
+    const downloadReportCsvBtn = document.getElementById("downloadReportCsv");
+    const studentNameInput = document.getElementById("studentName");
+
+    function project(lon, lat) {
+      const x = ((lon + 180) / 360) * 1000;
+      const latRad = (lat * Math.PI) / 180;
+      const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
+      const y = 260 - (1000 * mercN) / (2 * Math.PI);
+      return { x, y: Math.max(30, Math.min(490, y)) };
+    }
+
+    function csvEscape(value) {
+      const text = String(value ?? "");
+      return `"${text.replaceAll('"', '""')}"`;
+    }
+
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function selectedVolcano() {
+      return volcanoes.find(v => v.id === state.selectedId) || null;
+    }
+
+    function progressPercent() {
+      return Math.round((state.completed.length / volcanoes.length) * 100);
+    }
+
+    function setStep(step) {
+      state.step = step;
+      panelMap.classList.toggle("active", step === "map");
+      panelVideo.classList.toggle("active", step === "video");
+      panelQuestions.classList.toggle("active", step === "questions");
+      panelDone.classList.toggle("active", step === "done");
+      render();
+    }
+
+    function chooseVolcano(id) {
+      if (state.completed.includes(id)) return;
+      state.selectedId = id;
+      state.videoChecked = false;
+      setStep("video");
+    }
+
+    function resetApp() {
+      state.step = "map";
+      state.selectedId = null;
+      state.completed = [];
+      state.answers = Object.fromEntries(volcanoes.map(v => [v.id, ["", "", ""]]));
+      state.videoChecked = false;
+      state.studentName = "";
+      videoWatchedCheck.checked = false;
+      studentNameInput.value = "";
+      setStep("map");
+    }
+
+    function canSubmitCurrent() {
+      const volcano = selectedVolcano();
+      if (!volcano) return false;
+      return state.answers[volcano.id].every(a => a.trim().length > 0);
+    }
+
+    function submitLocation() {
+      const volcano = selectedVolcano();
+      if (!volcano || !canSubmitCurrent()) return;
+      if (!state.completed.includes(volcano.id)) state.completed.push(volcano.id);
+      if (state.completed.length === volcanoes.length) {
+        setStep("done");
+      } else {
+        state.selectedId = null;
+        state.videoChecked = false;
+        videoWatchedCheck.checked = false;
+        setStep("map");
+      }
+    }
+
+    function renderMarkers() {
+      markerOverlay.innerHTML = "";
+      const width = mapInner.clientWidth || 1000;
+      const height = mapInner.clientHeight || 520;
+
+      volcanoes.forEach(v => {
+        const projected = project(v.coordinates[0], v.coordinates[1]);
+        const x = (projected.x / 1000) * width;
+        const y = (projected.y / 520) * height;
+        const done = state.completed.includes(v.id);
+        const [dx, dy] = v.labelOffset || [18, -18];
+
+        const wrap = document.createElement("div");
+        wrap.className = "map-location";
+        wrap.style.left = `${x}px`;
+        wrap.style.top = `${y}px`;
+
+        const pinBtn = document.createElement("button");
+        pinBtn.type = "button";
+        pinBtn.className = "pin-btn";
+        pinBtn.disabled = done;
+        pinBtn.innerHTML = `
+          <svg class="map-pin" viewBox="0 0 24 36" aria-hidden="true">
+            <path d="M12 0C5.4 0 0 5.4 0 12c0 8.7 12 24 12 24s12-15.3 12-24C24 5.4 18.6 0 12 0z" fill="${done ? "#16a34a" : "#dc2626"}" stroke="white" stroke-width="2"></path>
+            <circle cx="12" cy="12" r="4.5" fill="white"></circle>
+          </svg>
+        `;
+        if (!done) pinBtn.addEventListener("click", () => chooseVolcano(v.id));
+
+        const label = document.createElement("button");
+        label.type = "button";
+        label.className = `marker-label ${done ? "done" : ""}`;
+        label.disabled = done;
+        label.style.left = `${dx}px`;
+        label.style.top = `${dy}px`;
+        label.innerHTML = `
+          <div class="name">${v.name}</div>
+          <div class="region">${v.region}</div>
+          <div class="state">${done ? "Completed" : "Open activity"}</div>
+        `;
+        if (!done) label.addEventListener("click", () => chooseVolcano(v.id));
+
+        wrap.appendChild(pinBtn);
+        wrap.appendChild(label);
+        markerOverlay.appendChild(wrap);
+      });
+    }
+
+    function renderStudentReportPanel() {
+      studentReportList.innerHTML = "";
+      volcanoes.forEach(v => {
+        const done = state.completed.includes(v.id);
+        const item = document.createElement("div");
+        item.className = "student-report-item";
+        item.innerHTML = `
+          <div class="split" style="align-items:center">
+            <div>
+              <div style="font-weight:700">${v.name}</div>
+              <div class="small muted mt-4">${v.region}</div>
+            </div>
+            <div style="font-size:12px;font-weight:700;color:${done ? "#15803d" : "#334155"};background:${done ? "#dcfce7" : "#e2e8f0"};border-radius:999px;padding:6px 12px;">${done ? "Ready for report" : "In progress"}</div>
+          </div>
+        `;
+        studentReportList.appendChild(item);
+      });
+    }
+
+    function renderVideoPanel() {
+      const volcano = selectedVolcano();
+      if (!volcano) return;
+      videoTitle.textContent = volcano.name;
+      videoLinkButton.href = volcano.video;
+      videoUrlText.textContent = volcano.video;
+      videoWatchedCheck.checked = state.videoChecked;
+      continueToQuestions.disabled = !state.videoChecked;
+    }
+
+    function renderQuestionsPanel() {
+      const volcano = selectedVolcano();
+      if (!volcano) return;
+      questionsTitle.textContent = `${volcano.name} Questions`;
+      questionsContainer.innerHTML = "";
+      volcano.questions.forEach((question, idx) => {
+        const card = document.createElement("div");
+        card.className = "question-card";
+        const value = state.answers[volcano.id][idx] || "";
+        card.innerHTML = `
+          <div class="question-title">${idx + 1}. ${question}</div>
+          <input class="text-input" type="text" placeholder="Type your response here" value="${value.replace(/"/g, '&quot;')}" />
+        `;
+        const input = card.querySelector("input");
+        input.addEventListener("input", (e) => {
+          state.answers[volcano.id][idx] = e.target.value;
+          submitLocationBtn.disabled = !canSubmitCurrent();
+        });
+        questionsContainer.appendChild(card);
+      });
+      submitLocationBtn.disabled = !canSubmitCurrent();
+    }
+
+    function exportAnswersCsv() {
+      const rows = volcanoes.map(v => ({
+        name: v.name,
+        region: v.region,
+        completed: state.completed.includes(v.id) ? "Yes" : "No",
+        video: v.video,
+        q1: state.answers[v.id][0] || "",
+        q2: state.answers[v.id][1] || "",
+        q3: state.answers[v.id][2] || ""
+      }));
+
+      const header = ["Volcano", "Region", "Completed", "Video URL", "Question 1", "Question 2", "Question 3"];
+      const csvLines = [header.map(csvEscape).join(",")];
+      rows.forEach((row) => {
+        csvLines.push([
+          row.name,
+          row.region,
+          row.completed,
+          row.video,
+          row.q1,
+          row.q2,
+          row.q3
+        ].map(csvEscape).join(","));
+      });
+
+      const cleaned = (studentNameInput.value || "student").trim().replace(/[^a-z0-9]/gi, "_").toLowerCase() || "student";
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+      downloadFile(`volcano_report_${cleaned}_${timestamp}.csv`, csvLines.join("\n"), "text/csv;charset=utf-8");
+    }
+
+    function render() {
+      progressText.textContent = `${state.completed.length} / ${volcanoes.length} complete`;
+      progressBar.style.width = `${progressPercent()}%`;
+      renderMarkers();
+      renderStudentReportPanel();
+      if (state.step === "video") renderVideoPanel();
+      if (state.step === "questions") renderQuestionsPanel();
+    }
+
+    document.getElementById("resetTop").addEventListener("click", resetApp);
+    document.getElementById("startOver").addEventListener("click", resetApp);
+    document.getElementById("backToMapFromVideo").addEventListener("click", () => setStep("map"));
+    document.getElementById("backToVideo").addEventListener("click", () => setStep("video"));
+    videoWatchedCheck.addEventListener("change", (e) => {
+      state.videoChecked = e.target.checked;
+      continueToQuestions.disabled = !state.videoChecked;
+    });
+    continueToQuestions.addEventListener("click", () => {
+      if (state.videoChecked) setStep("questions");
+    });
+    submitLocationBtn.addEventListener("click", submitLocation);
+    downloadReportCsvBtn.addEventListener("click", exportAnswersCsv);
+    mapBg.addEventListener("load", render);
+    window.addEventListener("resize", render);
+
+    render();
+  </script>
+</body>
+</html>
