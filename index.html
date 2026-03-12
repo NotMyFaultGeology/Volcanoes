@@ -204,8 +204,8 @@
     .row-card {
       box-shadow: 0 12px 24px rgba(15,23,42,0.08);
     }
-    .question-grid, .teacher-list { display: grid; gap: 16px; }
-    .question-card, .teacher-item {
+    .question-grid, .student-report-list { display: grid; gap: 16px; }
+    .question-card, .student-report-item {
       border-radius: 18px;
       border: 1px solid #e2e8f0;
       background: #f8fafc;
@@ -227,17 +227,19 @@
       font-size: 16px;
       outline: none;
     }
-    .teacher-status {
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 700;
-      background: #e2e8f0;
-      color: #334155;
+    .report-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
     }
-    .teacher-status.done {
-      background: #dcfce7;
-      color: #15803d;
+    .report-box {
+      border-radius: 18px;
+      background: #eff6ff;
+      padding: 16px;
+      font-size: 14px;
+      color: #334155;
+      margin-top: 20px;
     }
     .done-screen {
       min-height: 420px;
@@ -332,7 +334,7 @@
               <div class="pad-md split" style="align-items:center">
                 <div>
                   <div style="font-weight:700">Ready for the questions?</div>
-                  <div class="small muted mt-4">Check the box after the student has watched the video.</div>
+                  <div class="small muted mt-4">Check the box after you have watched the video.</div>
                 </div>
                 <div class="split" style="align-items:center">
                   <label class="check-row"><input id="videoWatchedCheck" type="checkbox" /> Video watched</label>
@@ -363,7 +365,14 @@
             <div class="done-screen">
               <div class="done-icon">✅</div>
               <h2 style="font-size:36px;margin:0">All volcano locations completed</h2>
-              <p class="mt-12 muted" style="max-width:720px">The student has watched all five videos and answered every question set. Use reset to run the activity again.</p>
+              <p class="mt-12 muted" style="max-width:720px">You have watched all five videos and answered every question set. Generate your report below, then email it to your teacher.</p>
+              <div class="report-actions">
+                <button id="downloadReportTxt" class="btn btn-outline">⬇ Download report (.txt)</button>
+                <button id="downloadReportCsv" class="btn btn-outline">⬇ Download report (.csv)</button>
+              </div>
+              <div class="report-box">
+                Suggested next step: attach your downloaded report to an email for your teacher, or copy and paste the report text into your email.
+              </div>
               <div class="mt-24">
                 <button id="startOver" class="btn">Start over</button>
               </div>
@@ -374,15 +383,10 @@
 
       <div class="card">
         <div class="pad-md">
-          <div style="font-size:24px;font-weight:800">Teacher Panel</div>
-          <div class="muted mt-8">This version is a single HTML file, so it is much easier to upload directly to GitHub Pages.</div>
+          <div style="font-size:24px;font-weight:800">Student Report</div>
+          <div class="muted mt-8">When you finish all five volcanoes, download your report and email it to your teacher.</div>
 
-          <div class="split mt-20" style="align-items:center">
-            <button id="exportTxt" class="btn btn-outline">⬇ Export answers (.txt)</button>
-            <button id="exportCsv" class="btn btn-outline">⬇ Export answers (.csv)</button>
-          </div>
-
-          <div id="teacherList" class="teacher-list mt-20"></div>
+          <div id="studentReportList" class="student-report-list mt-20"></div>
 
           <div class="info-box mt-20" style="background:#eff6ff">
             <div style="font-weight:700;margin-bottom:8px">Single-file notes</div>
@@ -482,7 +486,7 @@
     const progressBar = document.getElementById("progressBar");
     const markerOverlay = document.getElementById("markerOverlay");
     const mapInner = document.getElementById("mapInner");
-    const teacherList = document.getElementById("teacherList");
+    const studentReportList = document.getElementById("studentReportList");
     const videoTitle = document.getElementById("videoTitle");
     const videoLinkButton = document.getElementById("videoLinkButton");
     const videoUrlText = document.getElementById("videoUrlText");
@@ -491,8 +495,8 @@
     const questionsTitle = document.getElementById("questionsTitle");
     const questionsContainer = document.getElementById("questionsContainer");
     const submitLocationBtn = document.getElementById("submitLocation");
-    const exportTxtBtn = document.getElementById("exportTxt");
-    const exportCsvBtn = document.getElementById("exportCsv");
+    const downloadReportTxtBtn = document.getElementById("downloadReportTxt");
+    const downloadReportCsvBtn = document.getElementById("downloadReportCsv");
 
     function selectedVolcano() {
       return volcanoes.find(v => v.id === state.selectedId) || null;
@@ -616,22 +620,22 @@
       });
     }
 
-    function renderTeacherPanel() {
-      teacherList.innerHTML = "";
+    function renderStudentReportPanel() {
+      studentReportList.innerHTML = "";
       volcanoes.forEach(v => {
         const done = state.completed.includes(v.id);
         const item = document.createElement("div");
-        item.className = "teacher-item";
+        item.className = "student-report-item";
         item.innerHTML = `
           <div class="split" style="align-items:center">
             <div>
               <div style="font-weight:700">${escapeHtml(v.name)}</div>
               <div class="small muted mt-4">${escapeHtml(v.region)}</div>
             </div>
-            <div class="teacher-status ${done ? "done" : ""}">${done ? "Complete" : "Not started"}</div>
+            <div style="font-size:12px;font-weight:700;color:${done ? "#15803d" : "#334155"};background:${done ? "#dcfce7" : "#e2e8f0"};border-radius:999px;padding:6px 12px;">${done ? "Ready for report" : "In progress"}</div>
           </div>
         `;
-        teacherList.appendChild(item);
+        studentReportList.appendChild(item);
       });
     }
 
@@ -656,7 +660,7 @@
         const value = state.answers[volcano.id][idx] || "";
         card.innerHTML = `
           <div class="question-title">${idx + 1}. ${escapeHtml(question)}</div>
-          <input class="text-input" type="text" placeholder="Type the student's response here" value="${escapeHtml(value)}" data-index="${idx}" />
+          <input class="text-input" type="text" placeholder="Type your response here" value="${escapeHtml(value)}" data-index="${idx}" />
         `;
         const input = card.querySelector("input");
         input.addEventListener("input", (e) => {
@@ -736,7 +740,7 @@
       progressText.textContent = `${state.completed.length} / ${volcanoes.length} complete`;
       progressBar.style.width = `${progressPercent()}%`;
       renderMarkers();
-      renderTeacherPanel();
+      renderStudentReportPanel();
       if (state.step === "video") renderVideoPanel();
       if (state.step === "questions") renderQuestionsPanel();
     }
@@ -753,8 +757,8 @@
       if (state.videoChecked) setStep("questions");
     });
     submitLocationBtn.addEventListener("click", submitLocation);
-    exportTxtBtn.addEventListener("click", exportAnswersTxt);
-    exportCsvBtn.addEventListener("click", exportAnswersCsv);
+    downloadReportTxtBtn.addEventListener("click", exportAnswersTxt);
+    downloadReportCsvBtn.addEventListener("click", exportAnswersCsv);
     window.addEventListener("resize", render);
 
     render();
