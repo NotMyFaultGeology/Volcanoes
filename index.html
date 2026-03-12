@@ -68,7 +68,8 @@ const volcanoes = [
   },
 ];
 
-const mapSrc = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/2000px-World_map_-_low_resolution.svg.png";
+const mapSrc =
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/World_map_-_low_resolution.svg/2000px-World_map_-_low_resolution.svg.png";
 
 function project(lon, lat) {
   const x = ((lon + 180) / 360) * 1000;
@@ -95,6 +96,30 @@ function downloadFile(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
+function baseButtonStyle(enabled = true) {
+  return {
+    borderRadius: 16,
+    border: "none",
+    background: enabled ? "#0f172a" : "#cbd5e1",
+    color: enabled ? "#fff" : "#475569",
+    padding: "12px 18px",
+    fontWeight: 700,
+    cursor: enabled ? "pointer" : "not-allowed",
+  };
+}
+
+function outlineButtonStyle() {
+  return {
+    borderRadius: 16,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#0f172a",
+    padding: "12px 18px",
+    fontWeight: 700,
+    cursor: "pointer",
+  };
+}
+
 export default function VolcanoVideoQuizApp() {
   const [step, setStep] = useState("map");
   const [selectedId, setSelectedId] = useState(null);
@@ -105,6 +130,7 @@ export default function VolcanoVideoQuizApp() {
   const [videoChecked, setVideoChecked] = useState(false);
   const [studentName, setStudentName] = useState("");
   const [mapSize, setMapSize] = useState({ width: 1000, height: 520 });
+  const [isMobile, setIsMobile] = useState(false);
   const mapRef = useRef(null);
 
   const selected = useMemo(
@@ -113,14 +139,17 @@ export default function VolcanoVideoQuizApp() {
   );
 
   useEffect(() => {
-    const updateSize = () => {
-      if (!mapRef.current) return;
-      const rect = mapRef.current.getBoundingClientRect();
-      setMapSize({ width: rect.width || 1000, height: rect.height || 520 });
+    const updateLayout = () => {
+      if (mapRef.current) {
+        const rect = mapRef.current.getBoundingClientRect();
+        setMapSize({ width: rect.width || 1000, height: rect.height || 520 });
+      }
+      setIsMobile(window.innerWidth < 980);
     };
-    updateSize();
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
+
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
   }, []);
 
   const progressPercent = Math.round((completed.length / volcanoes.length) * 100);
@@ -149,6 +178,7 @@ export default function VolcanoVideoQuizApp() {
       ? completed
       : [...completed, selected.id];
     setCompleted(updated);
+
     if (updated.length === volcanoes.length) {
       setStep("done");
     } else {
@@ -169,7 +199,16 @@ export default function VolcanoVideoQuizApp() {
       q3: answers[v.id][2] || "",
     }));
 
-    const header = ["Volcano", "Region", "Completed", "Video URL", "Question 1", "Question 2", "Question 3"];
+    const header = [
+      "Volcano",
+      "Region",
+      "Completed",
+      "Video URL",
+      "Question 1",
+      "Question 2",
+      "Question 3",
+    ];
+
     const csvLines = [header.map(csvEscape).join(",")];
     rows.forEach((row) => {
       csvLines.push(
@@ -179,48 +218,165 @@ export default function VolcanoVideoQuizApp() {
       );
     });
 
-    const cleaned = (studentName || "student").trim().replace(/[^a-z0-9]/gi, "_").toLowerCase() || "student";
+    const cleaned =
+      (studentName || "student")
+        .trim()
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase() || "student";
+
     const now = new Date();
-    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
-    downloadFile(`volcano_report_${cleaned}_${timestamp}.csv`, csvLines.join("
-"), "text/csv;charset=utf-8");
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(now.getDate()).padStart(2, "0")}_${String(
+      now.getHours()
+    ).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+
+    downloadFile(
+      `volcano_report_${cleaned}_${timestamp}.csv`,
+      csvLines.join("
+"),
+      "text/csv;charset=utf-8"
+    );
   };
 
   return (
-    <div style={{ minHeight: "100vh", padding: 24, background: "#f8fafc", color: "#0f172a", fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-      <div style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "minmax(0,1.3fr) minmax(320px,0.7fr)", gap: 16 }}>
-        <div style={{ background: "#fff", borderRadius: 24, boxShadow: "0 16px 40px rgba(15,23,42,0.10)" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: 24,
+        background: "#f8fafc",
+        color: "#0f172a",
+        fontFamily:
+          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1320,
+          margin: "0 auto",
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1.3fr) minmax(320px,0.7fr)",
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 24,
+            boxShadow: "0 16px 40px rgba(15,23,42,0.10)",
+          }}
+        >
           <div style={{ padding: 28 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
               <div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 32, fontWeight: 800 }}>🌋 Volcano Video Map Activity</div>
-                <div style={{ marginTop: 10, fontSize: 16, color: "#475569", maxWidth: 760 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "center",
+                    fontSize: 32,
+                    fontWeight: 800,
+                  }}
+                >
+                  🌋 Volcano Video Map Activity
+                </div>
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: 16,
+                    color: "#475569",
+                    maxWidth: 760,
+                  }}
+                >
                   Students select one of five volcano locations, watch the video, answer three questions, and return to the map until all five are complete.
                 </div>
               </div>
-              <button onClick={resetApp} style={{ borderRadius: 16, border: "1px solid #cbd5e1", background: "#fff", color: "#0f172a", padding: "12px 18px", fontWeight: 700, cursor: "pointer" }}>↻ Reset</button>
+              <button onClick={resetApp} style={outlineButtonStyle()}>
+                ↻ Reset
+              </button>
             </div>
 
             <div style={{ marginTop: 20, marginBottom: 18 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#475569", marginBottom: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 14,
+                  color: "#475569",
+                  marginBottom: 8,
+                }}
+              >
                 <span>Progress</span>
-                <span>{completed.length} / {volcanoes.length} complete</span>
+                <span>
+                  {completed.length} / {volcanoes.length} complete
+                </span>
               </div>
-              <div style={{ height: 12, borderRadius: 999, background: "#e2e8f0", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${progressPercent}%`, background: "linear-gradient(90deg, #2563eb, #0ea5e9)", borderRadius: 999, transition: "width 0.25s ease" }} />
+              <div
+                style={{
+                  height: 12,
+                  borderRadius: 999,
+                  background: "#e2e8f0",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${progressPercent}%`,
+                    background: "linear-gradient(90deg, #2563eb, #0ea5e9)",
+                    borderRadius: 999,
+                    transition: "width 0.25s ease",
+                  }}
+                />
               </div>
             </div>
 
             {step === "map" && (
               <section>
-                <div style={{ overflow: "hidden", borderRadius: 28, border: "1px solid #cbd5e1", background: "linear-gradient(180deg,#dff3ff 0%,#cfe7ff 100%)", padding: 8, boxShadow: "inset 0 2px 8px rgba(255,255,255,0.7)" }}>
-                  <div ref={mapRef} style={{ position: "relative", borderRadius: 24, overflow: "hidden", minHeight: 520, background: "#dcefff" }}>
-                    <img src={mapSrc} alt="World map" onLoad={() => {
-                      if (mapRef.current) {
-                        const rect = mapRef.current.getBoundingClientRect();
-                        setMapSize({ width: rect.width || 1000, height: rect.height || 520 });
-                      }
-                    }} style={{ display: "block", width: "100%", minHeight: 520, objectFit: "cover" }} />
+                <div
+                  style={{
+                    overflow: "hidden",
+                    borderRadius: 28,
+                    border: "1px solid #cbd5e1",
+                    background: "linear-gradient(180deg,#dff3ff 0%,#cfe7ff 100%)",
+                    padding: 8,
+                    boxShadow: "inset 0 2px 8px rgba(255,255,255,0.7)",
+                  }}
+                >
+                  <div
+                    ref={mapRef}
+                    style={{
+                      position: "relative",
+                      borderRadius: 24,
+                      overflow: "hidden",
+                      minHeight: 520,
+                      background: "#dcefff",
+                    }}
+                  >
+                    <img
+                      src={mapSrc}
+                      alt="World map"
+                      onLoad={() => {
+                        if (mapRef.current) {
+                          const rect = mapRef.current.getBoundingClientRect();
+                          setMapSize({ width: rect.width || 1000, height: rect.height || 520 });
+                        }
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        minHeight: 520,
+                        objectFit: "cover",
+                      }}
+                    />
                     <div style={{ position: "absolute", inset: 0, zIndex: 2 }}>
                       {volcanoes.map((v) => {
                         const projected = project(v.coordinates[0], v.coordinates[1]);
@@ -228,11 +384,45 @@ export default function VolcanoVideoQuizApp() {
                         const y = (projected.y / 520) * mapSize.height;
                         const done = completed.includes(v.id);
                         const [dx, dy] = v.labelOffset || [18, -18];
+
                         return (
-                          <div key={v.id} style={{ position: "absolute", left: x, top: y, transform: "translate(-12px, -28px)", zIndex: 3 }}>
-                            <button type="button" disabled={done} onClick={() => chooseVolcano(v.id)} style={{ border: "none", background: "transparent", padding: 0, cursor: done ? "default" : "pointer" }}>
-                              <svg viewBox="0 0 24 36" style={{ width: 24, height: 36, display: "block", filter: "drop-shadow(0 3px 6px rgba(15,23,42,0.18))" }} aria-hidden="true">
-                                <path d="M12 0C5.4 0 0 5.4 0 12c0 8.7 12 24 12 24s12-15.3 12-24C24 5.4 18.6 0 12 0z" fill={done ? "#16a34a" : "#dc2626"} stroke="white" strokeWidth="2" />
+                          <div
+                            key={v.id}
+                            style={{
+                              position: "absolute",
+                              left: x,
+                              top: y,
+                              transform: "translate(-12px, -28px)",
+                              zIndex: 3,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              disabled={done}
+                              onClick={() => chooseVolcano(v.id)}
+                              style={{
+                                border: "none",
+                                background: "transparent",
+                                padding: 0,
+                                cursor: done ? "default" : "pointer",
+                              }}
+                            >
+                              <svg
+                                viewBox="0 0 24 36"
+                                style={{
+                                  width: 24,
+                                  height: 36,
+                                  display: "block",
+                                  filter: "drop-shadow(0 3px 6px rgba(15,23,42,0.18))",
+                                }}
+                                aria-hidden="true"
+                              >
+                                <path
+                                  d="M12 0C5.4 0 0 5.4 0 12c0 8.7 12 24 12 24s12-15.3 12-24C24 5.4 18.6 0 12 0z"
+                                  fill={done ? "#16a34a" : "#dc2626"}
+                                  stroke="white"
+                                  strokeWidth="2"
+                                />
                                 <circle cx="12" cy="12" r="4.5" fill="white" />
                               </svg>
                             </button>
@@ -248,15 +438,45 @@ export default function VolcanoVideoQuizApp() {
                                 padding: "8px 12px",
                                 borderRadius: 14,
                                 boxShadow: "0 8px 24px rgba(15,23,42,0.14)",
-                                background: done ? "rgba(240,253,244,0.96)" : "rgba(255,255,255,0.96)",
-                                border: `1px solid ${done ? "#86efac" : "rgba(255,255,255,0.85)"}`,
+                                background: done
+                                  ? "rgba(240,253,244,0.96)"
+                                  : "rgba(255,255,255,0.96)",
+                                border: `1px solid ${
+                                  done ? "#86efac" : "rgba(255,255,255,0.85)"
+                                }`,
                                 cursor: done ? "default" : "pointer",
                                 textAlign: "left",
                               }}
                             >
-                              <div style={{ fontWeight: 700, color: "#0f172a", lineHeight: 1.1 }}>{v.name}</div>
-                              <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.2, marginTop: 2 }}>{v.region}</div>
-                              <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: "#64748b" }}>{done ? "Completed" : "Open activity"}</div>
+                              <div
+                                style={{
+                                  fontWeight: 700,
+                                  color: "#0f172a",
+                                  lineHeight: 1.1,
+                                }}
+                              >
+                                {v.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "#475569",
+                                  lineHeight: 1.2,
+                                  marginTop: 2,
+                                }}
+                              >
+                                {v.region}
+                              </div>
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: "#64748b",
+                                }}
+                              >
+                                {done ? "Completed" : "Open activity"}
+                              </div>
                             </button>
                           </div>
                         );
@@ -264,7 +484,16 @@ export default function VolcanoVideoQuizApp() {
                     </div>
                   </div>
                 </div>
-                <div style={{ borderRadius: 18, background: "#f1f5f9", padding: 16, fontSize: 14, color: "#334155", marginTop: 12 }}>
+                <div
+                  style={{
+                    borderRadius: 18,
+                    background: "#f1f5f9",
+                    padding: 16,
+                    fontSize: 14,
+                    color: "#334155",
+                    marginTop: 12,
+                  }}
+                >
                   Click a map marker to begin. Finished locations are marked complete and cannot be reopened unless you reset the activity.
                 </div>
               </section>
@@ -272,37 +501,136 @@ export default function VolcanoVideoQuizApp() {
 
             {step === "video" && selected && (
               <section>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <div>
-                    <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>{selected.name}</h2>
-                    <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>Watch the assigned video before moving to the questions.</p>
+                    <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>
+                      {selected.name}
+                    </h2>
+                    <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>
+                      Watch the assigned video before moving to the questions.
+                    </p>
                   </div>
-                  <button onClick={() => setStep("map")} style={{ borderRadius: 16, border: "1px solid #cbd5e1", background: "#fff", color: "#0f172a", padding: "12px 18px", fontWeight: 700, cursor: "pointer" }}>Back to map</button>
+                  <button onClick={() => setStep("map")} style={outlineButtonStyle()}>
+                    Back to map
+                  </button>
                 </div>
 
-                <div style={{ borderRadius: 28, overflow: "hidden", background: "#0f172a", color: "#fff", boxShadow: "0 16px 40px rgba(15,23,42,0.16)", marginTop: 12 }}>
-                  <div style={{ aspectRatio: "16 / 9", width: "100%", background: "radial-gradient(circle at top,#334155,#0f172a 60%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 32 }}>
+                <div
+                  style={{
+                    borderRadius: 28,
+                    overflow: "hidden",
+                    background: "#0f172a",
+                    color: "#fff",
+                    boxShadow: "0 16px 40px rgba(15,23,42,0.16)",
+                    marginTop: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      aspectRatio: "16 / 9",
+                      width: "100%",
+                      background: "radial-gradient(circle at top,#334155,#0f172a 60%)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      textAlign: "center",
+                      padding: 32,
+                    }}
+                  >
                     <div style={{ fontSize: 56, lineHeight: 1 }}>▶</div>
                     <h3 style={{ fontSize: 32, margin: 0 }}>Open the assigned video</h3>
-                    <p style={{ marginTop: 12, maxWidth: 720, color: "#cbd5e1" }}>Some browsers or preview environments block embedded YouTube playback. Use the button below to open the video directly in YouTube in a new tab.</p>
+                    <p style={{ marginTop: 12, maxWidth: 720, color: "#cbd5e1" }}>
+                      Some browsers or preview environments block embedded YouTube playback. Use the button below to open the video directly in YouTube in a new tab.
+                    </p>
                     <div style={{ marginTop: 24 }}>
-                      <a href={selected.video} target="_blank" rel="noreferrer" style={{ borderRadius: 16, background: "#fff", color: "#0f172a", padding: "12px 18px", fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 8 }}>▶ Open video in YouTube</a>
+                      <a
+                        href={selected.video}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          borderRadius: 16,
+                          background: "#fff",
+                          color: "#0f172a",
+                          padding: "12px 18px",
+                          fontWeight: 700,
+                          textDecoration: "none",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        ▶ Open video in YouTube
+                      </a>
                     </div>
-                    <p style={{ marginTop: 18, fontSize: 14, color: "#94a3b8", wordBreak: "break-all" }}>{selected.video}</p>
+                    <p
+                      style={{
+                        marginTop: 18,
+                        fontSize: 14,
+                        color: "#94a3b8",
+                        wordBreak: "break-all",
+                      }}
+                    >
+                      {selected.video}
+                    </p>
                   </div>
                 </div>
 
-                <div style={{ background: "#fff", borderRadius: 24, boxShadow: "0 12px 24px rgba(15,23,42,0.08)", marginTop: 12 }}>
-                  <div style={{ padding: 24, display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: 24,
+                    boxShadow: "0 12px 24px rgba(15,23,42,0.08)",
+                    marginTop: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: 24,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                    }}
+                  >
                     <div>
                       <div style={{ fontWeight: 700 }}>Ready for the questions?</div>
-                      <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>Check the box after you have watched the video.</div>
+                      <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>
+                        Check the box after you have watched the video.
+                      </div>
                     </div>
                     <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600 }}>
-                        <input type="checkbox" checked={videoChecked} onChange={(e) => setVideoChecked(e.target.checked)} /> Video watched
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontSize: 14,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={videoChecked}
+                          onChange={(e) => setVideoChecked(e.target.checked)}
+                        />
+                        Video watched
                       </label>
-                      <button disabled={!videoChecked} onClick={() => setStep("questions")} style={{ borderRadius: 16, border: "none", background: videoChecked ? "#0f172a" : "#cbd5e1", color: videoChecked ? "#fff" : "#475569", padding: "12px 18px", fontWeight: 700, cursor: videoChecked ? "pointer" : "not-allowed" }}>Continue to questions</button>
+                      <button
+                        disabled={!videoChecked}
+                        onClick={() => setStep("questions")}
+                        style={baseButtonStyle(videoChecked)}
+                      >
+                        Continue to questions
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -311,23 +639,77 @@ export default function VolcanoVideoQuizApp() {
 
             {step === "questions" && selected && (
               <section>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <div>
-                    <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>{selected.name} Questions</h2>
-                    <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>Answer all three questions to finish this location.</p>
-                    <p style={{ color: "#475569", fontSize: 14, marginTop: 8, marginBottom: 0 }}>A complete report of all questions will be generated for submission after all locations are completed.</p>
+                    <h2 style={{ fontSize: 30, lineHeight: 1.1, margin: 0 }}>
+                      {selected.name} Questions
+                    </h2>
+                    <p style={{ color: "#475569", marginTop: 8, marginBottom: 0 }}>
+                      Answer all three questions to finish this location.
+                    </p>
+                    <p
+                      style={{
+                        color: "#475569",
+                        fontSize: 14,
+                        marginTop: 8,
+                        marginBottom: 0,
+                      }}
+                    >
+                      A complete report of all questions will be generated for submission after all locations are completed.
+                    </p>
                   </div>
-                  <button onClick={() => setStep("video")} style={{ borderRadius: 16, border: "1px solid #cbd5e1", background: "#fff", color: "#0f172a", padding: "12px 18px", fontWeight: 700, cursor: "pointer" }}>Back to video</button>
+                  <button onClick={() => setStep("video")} style={outlineButtonStyle()}>
+                    Back to video
+                  </button>
                 </div>
 
                 <div style={{ display: "grid", gap: 16, marginTop: 12 }}>
                   {selected.questions.map((question, idx) => (
-                    <div key={idx} style={{ background: "#fff", borderRadius: 18, boxShadow: "0 12px 24px rgba(15,23,42,0.08)", padding: 24 }}>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>{idx + 1}. {question}</div>
+                    <div
+                      key={idx}
+                      style={{
+                        background: "#fff",
+                        borderRadius: 18,
+                        boxShadow: "0 12px 24px rgba(15,23,42,0.08)",
+                        padding: 24,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 700,
+                          color: "#0f172a",
+                          marginBottom: 12,
+                        }}
+                      >
+                        {idx + 1}. {question}
+                      </div>
                       <input
                         value={answers[selected.id][idx]}
-                        onChange={(e) => setAnswers((prev) => ({ ...prev, [selected.id]: prev[selected.id].map((a, i) => i === idx ? e.target.value : a) }))}
-                        className="text-input"
+                        onChange={(e) =>
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [selected.id]: prev[selected.id].map((a, i) =>
+                              i === idx ? e.target.value : a
+                            ),
+                          }))
+                        }
+                        style={{
+                          width: "100%",
+                          height: 48,
+                          borderRadius: 16,
+                          border: "1px solid #cbd5e1",
+                          padding: "0 14px",
+                          fontSize: 16,
+                          outline: "none",
+                        }}
                         type="text"
                         placeholder="Type your response here"
                       />
@@ -335,28 +717,94 @@ export default function VolcanoVideoQuizApp() {
                   ))}
                 </div>
 
-                <div style={{ borderRadius: 18, background: "#f1f5f9", padding: 16, fontSize: 14, color: "#334155", marginTop: 12, display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-                  <div>When submitted, this location will be marked complete and you will return to the main map.</div>
-                  <button disabled={!canSubmit} onClick={submitLocation} style={{ borderRadius: 16, border: "none", background: canSubmit ? "#0f172a" : "#cbd5e1", color: canSubmit ? "#fff" : "#475569", padding: "12px 18px", fontWeight: 700, cursor: canSubmit ? "pointer" : "not-allowed" }}>Submit location</button>
+                <div
+                  style={{
+                    borderRadius: 18,
+                    background: "#f1f5f9",
+                    padding: 16,
+                    fontSize: 14,
+                    color: "#334155",
+                    marginTop: 12,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    When submitted, this location will be marked complete and you will return to the main map.
+                  </div>
+                  <button
+                    disabled={!canSubmit}
+                    onClick={submitLocation}
+                    style={baseButtonStyle(canSubmit)}
+                  >
+                    Submit location
+                  </button>
                 </div>
               </section>
             )}
 
             {step === "done" && (
               <section>
-                <div style={{ minHeight: 420, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 32, border: "1px solid #e2e8f0", background: "#fff", padding: 32, textAlign: "center", boxShadow: "0 16px 40px rgba(15,23,42,0.10)" }}>
+                <div
+                  style={{
+                    minHeight: 420,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 32,
+                    border: "1px solid #e2e8f0",
+                    background: "#fff",
+                    padding: 32,
+                    textAlign: "center",
+                    boxShadow: "0 16px 40px rgba(15,23,42,0.10)",
+                  }}
+                >
                   <div style={{ fontSize: 62, marginBottom: 16 }}>✅</div>
                   <h2 style={{ fontSize: 36, margin: 0 }}>All volcano locations completed</h2>
                   <div style={{ marginTop: 14, maxWidth: 420, width: "100%" }}>
-                    <input value={studentName} onChange={(e) => setStudentName(e.target.value)} className="text-input" placeholder="Enter your name for the report filename" />
+                    <input
+                      value={studentName}
+                      onChange={(e) => setStudentName(e.target.value)}
+                      style={{
+                        width: "100%",
+                        height: 48,
+                        borderRadius: 16,
+                        border: "1px solid #cbd5e1",
+                        padding: "0 14px",
+                        fontSize: 16,
+                        outline: "none",
+                      }}
+                      placeholder="Enter your name for the report filename"
+                    />
                   </div>
-                  <p style={{ marginTop: 12, maxWidth: 720, color: "#475569" }}>You have watched all five videos and answered every question set. Generate your report below and submit the downloaded .csv file to Canvas.</p>
+                  <p style={{ marginTop: 12, maxWidth: 720, color: "#475569" }}>
+                    You have watched all five videos and answered every question set. Generate your report below and submit the downloaded .csv file to Canvas.
+                  </p>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 20 }}>
-                    <button onClick={exportCsv} style={{ borderRadius: 16, border: "none", background: "#0f172a", color: "#fff", padding: "12px 18px", fontWeight: 700, cursor: "pointer" }}>⬇ Download report (.csv)</button>
+                    <button onClick={exportCsv} style={baseButtonStyle(true)}>
+                      ⬇ Download report (.csv)
+                    </button>
                   </div>
-                  <div style={{ borderRadius: 18, background: "#eff6ff", padding: 16, fontSize: 14, color: "#334155", marginTop: 20 }}>Submit your downloaded .csv file to Canvas.</div>
+                  <div
+                    style={{
+                      borderRadius: 18,
+                      background: "#eff6ff",
+                      padding: 16,
+                      fontSize: 14,
+                      color: "#334155",
+                      marginTop: 20,
+                    }}
+                  >
+                    Submit your downloaded .csv file to Canvas.
+                  </div>
                   <div style={{ marginTop: 24 }}>
-                    <button onClick={resetApp} style={{ borderRadius: 16, border: "none", background: "#0f172a", color: "#fff", padding: "12px 18px", fontWeight: 700, cursor: "pointer" }}>Start over</button>
+                    <button onClick={resetApp} style={baseButtonStyle(true)}>
+                      Start over
+                    </button>
                   </div>
                 </div>
               </section>
@@ -364,27 +812,72 @@ export default function VolcanoVideoQuizApp() {
           </div>
         </div>
 
-        <div style={{ background: "#fff", borderRadius: 24, boxShadow: "0 16px 40px rgba(15,23,42,0.10)" }}>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 24,
+            boxShadow: "0 16px 40px rgba(15,23,42,0.10)",
+          }}
+        >
           <div style={{ padding: 24 }}>
             <div style={{ fontSize: 24, fontWeight: 800 }}>Student Report</div>
-            <div style={{ color: "#475569", marginTop: 8 }}>When you finish all five volcanoes, download your report and submit the .csv file to Canvas.</div>
+            <div style={{ color: "#475569", marginTop: 8 }}>
+              When you finish all five volcanoes, download your report and submit the .csv file to Canvas.
+            </div>
             <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
               {volcanoes.map((v) => {
                 const done = completed.includes(v.id);
                 return (
-                  <div key={v.id} style={{ borderRadius: 18, border: "1px solid #e2e8f0", background: "#f8fafc", padding: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                  <div
+                    key={v.id}
+                    style={{
+                      borderRadius: 18,
+                      border: "1px solid #e2e8f0",
+                      background: "#f8fafc",
+                      padding: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        alignItems: "center",
+                      }}
+                    >
                       <div>
                         <div style={{ fontWeight: 700 }}>{v.name}</div>
-                        <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>{v.region}</div>
+                        <div style={{ fontSize: 14, color: "#475569", marginTop: 4 }}>
+                          {v.region}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: done ? "#15803d" : "#334155", background: done ? "#dcfce7" : "#e2e8f0", borderRadius: 999, padding: "6px 12px" }}>{done ? "Ready for report" : "In progress"}</div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: done ? "#15803d" : "#334155",
+                          background: done ? "#dcfce7" : "#e2e8f0",
+                          borderRadius: 999,
+                          padding: "6px 12px",
+                        }}
+                      >
+                        {done ? "Ready for report" : "In progress"}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div style={{ borderRadius: 18, background: "#eff6ff", padding: 16, fontSize: 14, color: "#334155", marginTop: 20 }}>
+            <div
+              style={{
+                borderRadius: 18,
+                background: "#eff6ff",
+                padding: 16,
+                fontSize: 14,
+                color: "#334155",
+                marginTop: 20,
+              }}
+            >
               <div style={{ fontWeight: 700, marginBottom: 8 }}>Single-file notes</div>
               <ul style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>
                 <li>No React build step is needed in canvas preview.</li>
