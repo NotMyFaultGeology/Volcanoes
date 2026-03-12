@@ -388,7 +388,7 @@
       <div class="card">
         <div class="pad-md">
           <div style="font-size:24px;font-weight:800">Student Report</div>
-          <div class="muted mt-8">When you finish all five volcanoes, download your report and email it to your teacher.</div>
+          <div class="muted mt-8">When you finish all five volcanoes, download your report and submit the .csv file to Canvas.</div>
 
           <div id="studentReportList" class="student-report-list mt-20"></div>
 
@@ -737,8 +737,7 @@
 
       const filename = `volcano_report_${studentName}_${timestamp}.csv`;
 
-      downloadFile(filename, csvLines.join("
-"), "text/csv;charset=utf-8");
+      downloadFile(filename, csvLines.join("\n"), "text/csv;charset=utf-8");
     }
 
     function render() {
