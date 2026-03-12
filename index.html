@@ -349,6 +349,7 @@
               <div>
                 <h2 id="questionsTitle" style="font-size:30px;line-height:1.1;margin:0"></h2>
                 <p class="muted mt-8" style="margin-bottom:0">Answer all three questions to finish this location.</p>
+                <p class="small muted mt-8">A complete report of all questions will be generated for submission after all locations are completed.</p>
               </div>
               <button id="backToVideo" class="btn btn-outline">Back to video</button>
             </div>
@@ -365,13 +366,16 @@
             <div class="done-screen">
               <div class="done-icon">✅</div>
               <h2 style="font-size:36px;margin:0">All volcano locations completed</h2>
+              <div style="margin-top:14px;max-width:420px;width:100%">
+                <input id="studentName" class="text-input" placeholder="Enter your name for the report filename" />
+              </div>
               <p class="mt-12 muted" style="max-width:720px">You have watched all five videos and answered every question set. Generate your report below, then email it to your teacher.</p>
               <div class="report-actions">
-                <button id="downloadReportTxt" class="btn btn-outline">⬇ Download report (.txt)</button>
-                <button id="downloadReportCsv" class="btn btn-outline">⬇ Download report (.csv)</button>
+                
+                <button id="downloadReportCsv" class="btn">⬇ Download report (.csv)</button>
               </div>
               <div class="report-box">
-                Suggested next step: attach your downloaded report to an email for your teacher, or copy and paste the report text into your email.
+                Submit your downloaded .csv file to Canvas.
               </div>
               <div class="mt-24">
                 <button id="startOver" class="btn">Start over</button>
@@ -495,7 +499,7 @@
     const questionsTitle = document.getElementById("questionsTitle");
     const questionsContainer = document.getElementById("questionsContainer");
     const submitLocationBtn = document.getElementById("submitLocation");
-    const downloadReportTxtBtn = document.getElementById("downloadReportTxt");
+    
     const downloadReportCsvBtn = document.getElementById("downloadReportCsv");
 
     function selectedVolcano() {
@@ -696,23 +700,7 @@
       URL.revokeObjectURL(url);
     }
 
-    function exportAnswersTxt() {
-      const lines = [];
-      lines.push("Volcano Video Quiz - Student Answers");
-      lines.push(`Exported: ${new Date().toLocaleString()}`);
-      lines.push("");
-      buildExportRows().forEach((row, idx) => {
-        lines.push(`${idx + 1}. ${row.name} (${row.region})`);
-        lines.push(`Completed: ${row.completed}`);
-        lines.push(`Video: ${row.video}`);
-        lines.push(`Question 1: ${row.q1 || "[No answer]"}`);
-        lines.push(`Question 2: ${row.q2 || "[No answer]"}`);
-        lines.push(`Question 3: ${row.q3 || "[No answer]"}`);
-        lines.push("");
-      });
-      downloadFile("volcano-video-quiz-answers.txt", lines.join("\n"), "text/plain;charset=utf-8");
-    }
-
+    
     function csvEscape(value) {
       const text = String(value ?? "");
       return `"${text.replaceAll('"', '""')}"`;
@@ -722,6 +710,7 @@
       const rows = buildExportRows();
       const header = ["Volcano", "Region", "Completed", "Video URL", "Question 1", "Question 2", "Question 3"];
       const csvLines = [header.map(csvEscape).join(",")];
+
       rows.forEach((row) => {
         csvLines.push([
           row.name,
@@ -733,7 +722,23 @@
           row.q3
         ].map(csvEscape).join(","));
       });
-      downloadFile("volcano-video-quiz-answers.csv", csvLines.join("\n"), "text/csv;charset=utf-8");
+
+      const nameInput = document.getElementById("studentName");
+      let studentName = (nameInput?.value || "student").trim();
+
+      studentName = studentName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+
+      const now = new Date();
+      const timestamp = now.getFullYear() + "-" +
+        String(now.getMonth()+1).padStart(2,'0') + "-" +
+        String(now.getDate()).padStart(2,'0') + "_" +
+        String(now.getHours()).padStart(2,'0') + "-" +
+        String(now.getMinutes()).padStart(2,'0');
+
+      const filename = `volcano_report_${studentName}_${timestamp}.csv`;
+
+      downloadFile(filename, csvLines.join("
+"), "text/csv;charset=utf-8");
     }
 
     function render() {
@@ -757,7 +762,7 @@
       if (state.videoChecked) setStep("questions");
     });
     submitLocationBtn.addEventListener("click", submitLocation);
-    downloadReportTxtBtn.addEventListener("click", exportAnswersTxt);
+    
     downloadReportCsvBtn.addEventListener("click", exportAnswersCsv);
     window.addEventListener("resize", render);
 
