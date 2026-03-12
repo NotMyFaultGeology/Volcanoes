@@ -712,8 +712,7 @@
         String(now.getMinutes()).padStart(2, "0");
 
       const filename = `volcano_report_${studentName}_${timestamp}.csv`;
-      downloadFile(filename, csvLines.join("
-"), "text/csv;charset=utf-8");
+      downloadFile(filename, csvLines.join("\n"), "text/csv;charset=utf-8");
     }
 
     function render() {
